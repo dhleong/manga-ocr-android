@@ -61,16 +61,17 @@ class MainActivity : ComponentActivity() {
 
     private fun process(setBitmap: (Bitmap) -> Unit) {
         lifecycleScope.launch {
-            val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.RGB_565)
+            val bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.RGB_565)
             Canvas(bitmap).apply {
                 drawColor(0xffFFFFFF.toInt())
                 drawText(
                     "漫画",
-                    256f,
-                    256f,
+                    128f,
+                    128f,
                     Paint().apply {
+                        textAlign = Paint.Align.CENTER
                         color = 0xff000000.toInt()
-                        textSize = 32f
+                        textSize = 96f
                     },
                 )
             }

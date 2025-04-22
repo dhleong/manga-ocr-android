@@ -43,20 +43,29 @@ class OrtMangaOcr private constructor(
             val logitsTensor = outputs.get("logits").get() as OnnxTensor
 
             val logits = logitsTensor.floatBuffer
+            val shape = logitsTensor.info.shape
+            if (shape.size != 3 || shape[0] != 1L) {
+                throw IllegalStateException("Unexpected output tensor shape: ${shape.toList()}")
+            }
             if (logits.limit() == 0) {
                 throw IllegalStateException("Empty logits")
             }
+            val count = shape[2].toInt()
+            val start = count * (shape[1].toInt() - 1)
+            val end = start + count
 
             // find argmax
             var maxTokenId = -1
             var maxArg = 0f
-            for (i in logits.limit() - 1 downTo 0) {
+            for (i in start until end) {
                 val value = logits.get(i)
                 if (maxTokenId < 0 || value > maxArg) {
                     Log.v("ORT", "max @$i token $i = $value")
-                    maxTokenId = i
+                    maxTokenId = (i - start)
+//                    maxTokenId = candidateTokenId
                     maxArg = value
                 }
+//                candidateTokenId += 1
             }
 
             if (maxTokenId < 0) {

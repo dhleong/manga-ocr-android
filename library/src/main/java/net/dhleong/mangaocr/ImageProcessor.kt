@@ -30,19 +30,33 @@ class ImageProcessor<T>(
             for (x in 0 until inputWidth) {
                 val pixel = resizedBitmap.getPixel(x, y)
 
-                // Extract RGB values
-                val r = Color.red(pixel) / 255.0f
-                val g = Color.green(pixel) / 255.0f
-                val b = Color.blue(pixel) / 255.0f
+                // in [0, 1]
+                val gray = Color.luminance(pixel)
 
-                // Normalize and store in CHW order (PyTorch format)
-                buffer.put((r - mean[0]) / std[0])
-                buffer.put((g - mean[1]) / std[1])
-                buffer.put((b - mean[2]) / std[2])
+                // normalize to [-1, 1]
+                val normalized = (gray - 0.5f) / 0.5f
+
+//                // Extract RGB values
+//                val r = Color.red(pixel) / 255.0f
+//                val g = Color.green(pixel) / 255.0f
+//                val b = Color.blue(pixel) / 255.0f
+//
+//                // Normalize and store in CHW order (PyTorch format)
+//                buffer.put((r - mean[0]) / std[0])
+//                buffer.put((g - mean[1]) / std[1])
+//                buffer.put((b - mean[2]) / std[2])
+
+                buffer.put(normalized)
+                buffer.put(normalized)
+                buffer.put(normalized)
             }
         }
 
-        buffer.rewind()
+        if (resizedBitmap !== bitmap) {
+            resizedBitmap.recycle()
+        }
+
+        buffer.flip()
 
         // Create tensor with shape [1, 3, 224, 224]
         return floatsToTensor(buffer, shape)
