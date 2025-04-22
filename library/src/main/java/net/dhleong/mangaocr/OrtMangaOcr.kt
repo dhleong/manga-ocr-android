@@ -29,7 +29,7 @@ class OrtMangaOcr private constructor(
         val tokenIds = LongBuffer.allocate(maxChars)
         tokenIds.put(2) // start token
 
-        for (tokensCount in 1..maxChars) {
+        for (tokensCount in 1 until maxChars) {
             // Prepare to read the tokenIds:
             tokenIds.flip()
 
@@ -53,6 +53,7 @@ class OrtMangaOcr private constructor(
             for (i in logits.limit() - 1 downTo 0) {
                 val value = logits.get(i)
                 if (maxTokenId < 0 || value > maxArg) {
+                    Log.v("ORT", "max @$i token $i = $value")
                     maxTokenId = i
                     maxArg = value
                 }
@@ -69,6 +70,12 @@ class OrtMangaOcr private constructor(
 
             // Quit on end token
             if (maxTokenId == 3) {
+                break
+            }
+
+            // Quick reject, mainly for testing:
+            if (tokenIds.limit() >= 5 && tokenIds.array().take(5).all { it == 2L }) {
+                Log.v("ORT", "Doesn't look like anything to me")
                 break
             }
         }
