@@ -31,11 +31,11 @@ class HfHubRepo(
 
         val parent = File(File(context.noBackupFilesDir, "hf"), name)
         val localPath = File(parent, repoPath)
-        if (localPath.exists() && getSha256Hash(localPath) == sha256) {
+        if (localPath.exists()) {
             return localPath
-        } else if (localPath.exists()) {
-            Log.v("HUB", "Redownloading $repoPath")
         }
+
+        Log.v("HUB", "Downloading $repoPath")
 
         // NOTE: localPath.parentFile *may* not be the same as parent
         requireNotNull(localPath.parentFile).mkdirs()

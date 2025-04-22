@@ -1,17 +1,20 @@
 package net.dhleong.mangaocr
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.lifecycle.AtomicReference
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MangaOcrManager(
     context: Context,
-    private val scope: LifecycleCoroutineScope,
+    scope: LifecycleCoroutineScope,
     private val lifecycle: Lifecycle,
 ) {
     private val model: AtomicReference<MangaOcr?> = AtomicReference(null)
@@ -38,7 +41,10 @@ class MangaOcrManager(
         return requireNotNull(model.get())
     }
 
-    suspend fun process() {
-        awaitModel().process()
+    suspend fun process(bitmap: Bitmap) {
+        val model = awaitModel()
+        withContext(Dispatchers.IO) {
+            model.process(bitmap)
+        }
     }
 }

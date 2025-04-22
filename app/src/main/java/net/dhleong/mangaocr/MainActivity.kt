@@ -1,5 +1,6 @@
 package net.dhleong.mangaocr
 
+import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,7 +47,7 @@ class MainActivity : ComponentActivity() {
 
     private fun process() {
         lifecycleScope.launch {
-            manager.process()
+            manager.process(Bitmap.createBitmap(2048, 2048, Bitmap.Config.RGB_565))
         }
     }
 }
