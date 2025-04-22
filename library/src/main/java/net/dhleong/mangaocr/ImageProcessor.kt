@@ -1,0 +1,50 @@
+package net.dhleong.mangaocr
+
+// ImageProcessor.kt
+import android.graphics.Bitmap
+import android.graphics.Color
+import org.pytorch.executorch.Tensor
+import java.nio.FloatBuffer
+
+class ImageProcessor {
+    // Size expected by the ViT model
+    private val inputHeight = 224
+    private val inputWidth = 224
+
+    // Normalization parameters from ViTImageProcessor
+    private val mean = floatArrayOf(0.485f, 0.456f, 0.406f)
+    private val std = floatArrayOf(0.229f, 0.224f, 0.225f)
+
+    fun preprocess(bitmap: Bitmap): Tensor {
+        // Convert to RGB if needed
+        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputWidth, inputHeight, true)
+
+        // Allocate buffer for tensor
+        val buffer = FloatBuffer.allocate(3 * inputHeight * inputWidth)
+
+        // Convert bitmap to normalized float tensor
+        for (y in 0 until inputHeight) {
+            for (x in 0 until inputWidth) {
+                val pixel = resizedBitmap.getPixel(x, y)
+
+                // Extract RGB values
+                val r = Color.red(pixel) / 255.0f
+                val g = Color.green(pixel) / 255.0f
+                val b = Color.blue(pixel) / 255.0f
+
+                // Normalize and store in CHW order (PyTorch format)
+                buffer.put((r - mean[0]) / std[0])
+                buffer.put((g - mean[1]) / std[1])
+                buffer.put((b - mean[2]) / std[2])
+            }
+        }
+
+        buffer.rewind()
+
+        // Create tensor with shape [1, 3, 224, 224]
+        return Tensor.fromBlob(
+            buffer,
+            longArrayOf(1, 3, inputHeight.toLong(), inputWidth.toLong()),
+        )
+    }
+}
