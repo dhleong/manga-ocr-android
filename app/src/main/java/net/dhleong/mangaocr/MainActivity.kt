@@ -23,8 +23,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
+import coil3.ImageLoader
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
 import kotlinx.coroutines.launch
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
+
+private const val USE_REAL_IMAGE = true
 
 class MainActivity : ComponentActivity() {
     private lateinit var manager: MangaOcrManager
@@ -61,22 +68,38 @@ class MainActivity : ComponentActivity() {
 
     private fun process(setBitmap: (Bitmap) -> Unit) {
         lifecycleScope.launch {
-            val bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.RGB_565)
-            Canvas(bitmap).apply {
-                drawColor(0xffFFFFFF.toInt())
-                drawText(
-                    "漫画",
-                    128f,
-                    128f,
-                    Paint().apply {
-                        textAlign = Paint.Align.CENTER
-                        color = 0xff000000.toInt()
-                        textSize = 96f
-                    },
-                )
-            }
-            manager.process(bitmap)
+            val bitmap =
+                if (!USE_REAL_IMAGE) {
+                    Bitmap.createBitmap(256, 256, Bitmap.Config.RGB_565).also {
+                        Canvas(it).apply {
+                            drawColor(0xffFFFFFF.toInt())
+                            drawText(
+                                "漫画",
+                                128f,
+                                128f,
+                                Paint().apply {
+                                    textAlign = Paint.Align.CENTER
+                                    color = 0xff000000.toInt()
+                                    textSize = 96f
+                                },
+                            )
+                        }
+                    }
+                } else {
+                    val imageResult =
+                        ImageLoader(this@MainActivity).execute(
+                            ImageRequest
+                                .Builder(this@MainActivity)
+                                .data(
+                                    "https://github.com/kha-white/manga-ocr/raw/master/assets/examples/00.jpg",
+                                ).allowHardware(false)
+                                .build(),
+                        )
+                    (imageResult as SuccessResult).image.toBitmap()
+                }
+
             setBitmap(bitmap)
+            manager.process(bitmap)
         }
     }
 }

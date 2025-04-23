@@ -12,9 +12,13 @@ composeBom = "2024.04.01"
 executorch = "0.6.0-rc1"
 ort = "1.21.0"
 
+coil = "3.1.0"
+
 [libraries]
 executorch = { group = "org.pytorch", name = "executorch-android", version.ref = "executorch" }
 ort = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "ort" }
+
+coil-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
