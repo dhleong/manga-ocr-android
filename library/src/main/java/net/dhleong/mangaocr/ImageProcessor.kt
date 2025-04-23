@@ -27,12 +27,17 @@ class ImageProcessor<T>(
         buffer.limit(buffer.capacity())
 
         // Convert bitmap to normalized float tensor
+        // The shape here seems to be:
+        // R[height, width], G[height, width], B[height, width]
         for (y in 0 until inputHeight) {
             for (x in 0 until inputWidth) {
                 val pixel = resizedBitmap.getPixel(x, y)
 
                 // in [0, 1]
-                val gray = Color.luminance(pixel)
+                val gray = (0xffFFFFFF * Color.luminance(pixel)).toInt()
+                val r = Color.red(gray)
+                val g = Color.green(gray)
+                val b = Color.blue(gray)
 
                 // normalize to [-1, 1]
                 val normalized = (gray - 0.5f) / 0.5f
@@ -47,10 +52,13 @@ class ImageProcessor<T>(
 //                buffer.put((g - mean[1]) / std[1])
 //                buffer.put((b - mean[2]) / std[2])
 
-                val j = x * y
-                buffer.put(j, normalized)
-                buffer.put(j + inputHeight * inputWidth, normalized)
-                buffer.put(j + 2 * inputHeight * inputWidth, normalized)
+                val ri = y * inputWidth + x
+                val gi = 1 * inputWidth * inputHeight + ri
+                val bi = 2 * inputWidth * inputHeight + ri
+                buffer.put(ri, (r / 255f - 0.5f) / 0.5f)
+                buffer.put(gi, (g / 255f - 0.5f) / 0.5f)
+                buffer.put(bi, (b / 255f - 0.5f) / 0.5f)
+
 //                buffer.put(normalized)
 //                buffer.put(normalized)
 //                buffer.put(normalized)
