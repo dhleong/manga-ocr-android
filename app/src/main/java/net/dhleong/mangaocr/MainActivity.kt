@@ -34,6 +34,7 @@ import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
 
 private const val USE_REAL_IMAGE = true
@@ -79,8 +80,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         lastBitmap?.let {
-                            val resized = Bitmap.createScaledBitmap(it, 224, 224, true)
-                            Image(bitmap = resized.asImageBitmap(), "woah")
+                            Image(bitmap = it.asImageBitmap(), "woah")
                         }
 
                         Text(output)
@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
                     image.toBitmap()
                 }
 
-            setBitmap(bitmap)
+            setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(224, 224))
             manager
                 .process(bitmap)
                 .collect { event ->

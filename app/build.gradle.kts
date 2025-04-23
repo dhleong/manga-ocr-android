@@ -25,6 +25,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // HACK: We're not going to release this, but release mode is occasionally
+            // interesting for perf testing
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
