@@ -7,6 +7,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -16,7 +17,7 @@ class MangaOcrManager(
     context: Context,
     scope: LifecycleCoroutineScope,
     private val lifecycle: Lifecycle,
-) {
+) : MangaOcr {
     private val model: AtomicReference<MangaOcr?> = AtomicReference(null)
     private val modelLoaded = MutableSharedFlow<Unit>()
 
@@ -41,9 +42,9 @@ class MangaOcrManager(
         return requireNotNull(model.get())
     }
 
-    suspend fun process(bitmap: Bitmap) {
+    override suspend fun process(bitmap: Bitmap): Flow<MangaOcr.Result> {
         val model = awaitModel()
-        withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             model.process(bitmap)
         }
     }

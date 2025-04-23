@@ -10,6 +10,9 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.hub.HfHubRepo
 import java.io.File
@@ -23,90 +26,91 @@ class OrtMangaOcr private constructor(
             OnnxTensor.createTensor(OrtEnvironment.getEnvironment(), floats, shape)
         },
 ) : MangaOcr {
-    override suspend fun process(bitmap: Bitmap) {
-        // TODO: Cancel any pending invocation?
-        val maxChars = 80
-        val image = processor.preprocess(bitmap)
-        val tokenIds = LongBuffer.allocate(maxChars)
-        tokenIds.put(2) // start token
+    override suspend fun process(bitmap: Bitmap): Flow<MangaOcr.Result> =
+        flow {
+            // TODO: Cancel any pending invocation?
+            val maxChars = 80
+            val image = processor.preprocess(bitmap)
+            val tokenIds = LongBuffer.allocate(maxChars)
+            tokenIds.put(2) // start token
 
-        for (tokensCount in 1 until maxChars) {
-            // Prepare to read the tokenIds:
-            tokenIds.flip()
+            val result = StringBuilder(tokenIds.limit())
 
-            val tokenIdsTensor =
-                OnnxTensor.createTensor(
-                    OrtEnvironment.getEnvironment(),
-                    tokenIds,
-                    longArrayOf(1, tokensCount.toLong()),
-                )
-            val outputs = session.run(mapOf("image" to image, "token_ids" to tokenIdsTensor))
-            val logitsTensor = outputs.get("logits").get() as OnnxTensor
+            for (tokensCount in 1 until maxChars) {
+                // Prepare to read the tokenIds:
+                tokenIds.flip()
 
-            val logits = logitsTensor.floatBuffer
-            val shape = logitsTensor.info.shape
-            if (shape.size != 3 || shape[0] != 1L) {
-                throw IllegalStateException("Unexpected output tensor shape: ${shape.toList()}")
-            }
-            if (logits.limit() == 0) {
-                throw IllegalStateException("Empty logits")
-            }
-            val resultRows = shape[1].toInt()
-            val count = shape[2].toInt()
-            if (resultRows < 1) {
-                throw IllegalStateException("No resultRows")
-            }
-            Log.v("ORT", "Result rows = $resultRows")
-            val start = count * (resultRows - 1)
-            val end = start + count
+                val tokenIdsTensor =
+                    OnnxTensor.createTensor(
+                        OrtEnvironment.getEnvironment(),
+                        tokenIds,
+                        longArrayOf(1, tokensCount.toLong()),
+                    )
+                val outputs = session.run(mapOf("image" to image, "token_ids" to tokenIdsTensor))
+                val logitsTensor = outputs.get("logits").get() as OnnxTensor
 
-            // find argmax
-            var maxTokenId = -1
-            var maxArg = 0f
-            for (i in start until end) {
-                val value = logits.get(i)
-                if (maxTokenId < 0 || value > maxArg) {
-//                    Log.v("ORT", "max @$i token $i = $value")
-                    maxTokenId = (i - start)
-//                    maxTokenId = candidateTokenId
-                    maxArg = value
+                val logits = logitsTensor.floatBuffer
+                val shape = logitsTensor.info.shape
+                if (shape.size != 3 || shape[0] != 1L) {
+                    throw IllegalStateException("Unexpected output tensor shape: ${shape.toList()}")
                 }
+                if (logits.limit() == 0) {
+                    throw IllegalStateException("Empty logits")
+                }
+                val resultRows = shape[1].toInt()
+                val count = shape[2].toInt()
+                if (resultRows < 1) {
+                    throw IllegalStateException("No resultRows")
+                }
+                Log.v("ORT", "Result rows = $resultRows")
+                val start = count * (resultRows - 1)
+                val end = start + count
+
+                // find argmax
+                var maxTokenId = -1
+                var maxArg = 0f
+                for (i in start until end) {
+                    val value = logits.get(i)
+                    if (maxTokenId < 0 || value > maxArg) {
+//                    Log.v("ORT", "max @$i token $i = $value")
+                        maxTokenId = (i - start)
+//                    maxTokenId = candidateTokenId
+                        maxArg = value
+                    }
 //                candidateTokenId += 1
+                }
+
+                if (maxTokenId < 0) {
+                    throw IllegalStateException("No max token found")
+                }
+
+                tokenIds.limit(tokensCount + 1)
+                tokenIds.position(tokensCount)
+                tokenIds.put(maxTokenId.toLong())
+
+                val token = vocab.lookupToken(maxTokenId)
+                if (maxTokenId >= 5) {
+                    result.append(token)
+                    emit(MangaOcr.Result.Partial(result))
+                }
+
+                Log.v("ORT", "Got token $maxTokenId ($token); tokenIds=${tokenIds.array().take(tokensCount).toList()}")
+
+                // Quit on end token
+                if (maxTokenId == 3) {
+                    break
+                }
+
+                // Quick reject, mainly for testing:
+                if (tokenIds.limit() >= 5 && tokenIds.array().take(5).all { it == 2L }) {
+                    Log.v("ORT", "Doesn't look like anything to me")
+                    break
+                }
             }
 
-            if (maxTokenId < 0) {
-                throw IllegalStateException("No max token found")
-            }
-
-            tokenIds.limit(tokensCount + 1)
-            tokenIds.position(tokensCount)
-            tokenIds.put(maxTokenId.toLong())
-            val token = vocab.lookupToken(maxTokenId)
-            Log.v("ORT", "Got token $maxTokenId ($token); tokenIds=${tokenIds.array().take(tokensCount).toList()}")
-
-            // Quit on end token
-            if (maxTokenId == 3) {
-                break
-            }
-
-            // Quick reject, mainly for testing:
-            if (tokenIds.limit() >= 5 && tokenIds.array().take(5).all { it == 2L }) {
-                Log.v("ORT", "Doesn't look like anything to me")
-                break
-            }
-        }
-
-        tokenIds.flip()
-
-        val result = mutableListOf<String>()
-        while (tokenIds.hasRemaining()) {
-            val tokenId = tokenIds.get()
-            if (tokenId >= 5) {
-                result += vocab.lookupToken(tokenId.toInt())
-            }
-        }
-        Log.v("ORT", "Got: $result")
-    }
+            emit(MangaOcr.Result.FinalResult(result.toString()))
+            Log.v("ORT", "Got: $result")
+        }.flowOn(Dispatchers.IO)
 
     companion object {
         suspend fun initialize(context: Context): OrtMangaOcr =

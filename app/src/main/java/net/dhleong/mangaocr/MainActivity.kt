@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +31,9 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
 
 private const val USE_REAL_IMAGE = true
@@ -46,6 +49,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var lastBitmap: Bitmap? by remember { mutableStateOf(null) }
+            var loading by remember { mutableStateOf(false) }
+            var output by remember { mutableStateOf("") }
+
+            val onLoading: (Boolean) -> Unit = { loading = it }
+            val onBitmap: (Bitmap) -> Unit = { lastBitmap = it }
+            val onResult: (CharSequence) -> Unit = { output = it.toString() }
 
             MangaOCRTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -58,13 +67,13 @@ class MainActivity : ComponentActivity() {
                         if (USE_REAL_IMAGE) {
                             Row {
                                 for (i in 0..5) {
-                                    Button(onClick = { process(i) { lastBitmap = it } }) {
+                                    Button(onClick = { process(i, onLoading, onBitmap, onResult) }) {
                                         Text("#$i")
                                     }
                                 }
                             }
                         } else {
-                            Button(onClick = { process(0) { lastBitmap = it } }) {
+                            Button(onClick = { process(0, onLoading, onBitmap, onResult) }) {
                                 Text("Hi")
                             }
                         }
@@ -72,6 +81,12 @@ class MainActivity : ComponentActivity() {
                         lastBitmap?.let {
                             val resized = Bitmap.createScaledBitmap(it, 224, 224, true)
                             Image(bitmap = resized.asImageBitmap(), "woah")
+                        }
+
+                        Text(output)
+
+                        if (loading) {
+                            CircularProgressIndicator()
                         }
                     }
                 }
@@ -81,9 +96,12 @@ class MainActivity : ComponentActivity() {
 
     private fun process(
         index: Int,
+        setLoading: (Boolean) -> Unit,
         setBitmap: (Bitmap) -> Unit,
+        setResult: (CharSequence) -> Unit,
     ) {
         lifecycleScope.launch {
+            setLoading(true)
             val bitmap =
                 if (!USE_REAL_IMAGE) {
                     Bitmap.createBitmap(256, 256, Bitmap.Config.RGB_565).also {
@@ -117,7 +135,23 @@ class MainActivity : ComponentActivity() {
                 }
 
             setBitmap(bitmap)
-            manager.process(bitmap)
+            manager
+                .process(bitmap)
+                .collect { event ->
+                    withContext(Dispatchers.Main) {
+                        when (event) {
+                            is MangaOcr.Result.Partial -> {
+                                setResult(event.text)
+                            }
+
+                            is MangaOcr.Result.FinalResult -> {
+                                setResult(event.text)
+                            }
+                        }
+                    }
+                }
+
+            setLoading(false)
         }
     }
 }

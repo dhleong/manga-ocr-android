@@ -2,9 +2,20 @@ package net.dhleong.mangaocr
 
 import android.content.Context
 import android.graphics.Bitmap
+import kotlinx.coroutines.flow.Flow
 
 interface MangaOcr {
-    suspend fun process(bitmap: Bitmap)
+    sealed interface Result {
+        data class Partial(
+            val text: CharSequence,
+        ) : Result
+
+        data class FinalResult(
+            val text: String,
+        ) : Result
+    }
+
+    suspend fun process(bitmap: Bitmap): Flow<Result>
 
     companion object {
         suspend fun initialize(context: Context): MangaOcr = OrtMangaOcr.initialize(context)
