@@ -3,6 +3,7 @@ package net.dhleong.mangaocr
 // ImageProcessor.kt
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.util.Log
 import java.nio.FloatBuffer
 
 class ImageProcessor<T>(
@@ -23,6 +24,7 @@ class ImageProcessor<T>(
     fun preprocess(bitmap: Bitmap): T {
         // Convert to RGB if needed
         val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputWidth, inputHeight, true)
+        Log.v("ImageProcessor", "resized ${bitmap.width} / ${bitmap.height} to ${resizedBitmap.width} / ${resizedBitmap.height}")
         buffer.clear()
         buffer.limit(buffer.capacity())
 

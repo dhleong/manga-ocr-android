@@ -4,11 +4,13 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -53,12 +55,23 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(innerPadding),
                         )
 
-                        Button(onClick = { process { lastBitmap = it } }) {
-                            Text("Hi")
+                        if (USE_REAL_IMAGE) {
+                            Row {
+                                for (i in 0..5) {
+                                    Button(onClick = { process(i) { lastBitmap = it } }) {
+                                        Text("#$i")
+                                    }
+                                }
+                            }
+                        } else {
+                            Button(onClick = { process(0) { lastBitmap = it } }) {
+                                Text("Hi")
+                            }
                         }
 
                         lastBitmap?.let {
-                            Image(bitmap = it.asImageBitmap(), "woah")
+                            val resized = Bitmap.createScaledBitmap(it, 224, 224, true)
+                            Image(bitmap = resized.asImageBitmap(), "woah")
                         }
                     }
                 }
@@ -66,7 +79,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun process(setBitmap: (Bitmap) -> Unit) {
+    private fun process(
+        index: Int,
+        setBitmap: (Bitmap) -> Unit,
+    ) {
         lifecycleScope.launch {
             val bitmap =
                 if (!USE_REAL_IMAGE) {
@@ -91,11 +107,13 @@ class MainActivity : ComponentActivity() {
                             ImageRequest
                                 .Builder(this@MainActivity)
                                 .data(
-                                    "https://github.com/kha-white/manga-ocr/raw/master/assets/examples/00.jpg",
+                                    "https://github.com/kha-white/manga-ocr/raw/master/assets/examples/0$index.jpg",
                                 ).allowHardware(false)
                                 .build(),
                         )
-                    (imageResult as SuccessResult).image.toBitmap()
+                    val image = (imageResult as SuccessResult).image
+                    Log.v("OCR", "Loaded $image @ ${image.width} x ${image.height}")
+                    image.toBitmap()
                 }
 
             setBitmap(bitmap)
