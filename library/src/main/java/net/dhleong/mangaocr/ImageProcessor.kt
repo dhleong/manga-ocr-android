@@ -24,6 +24,7 @@ class ImageProcessor<T>(
         // Convert to RGB if needed
         val resizedBitmap = Bitmap.createScaledBitmap(bitmap, inputWidth, inputHeight, true)
         buffer.clear()
+        buffer.limit(buffer.capacity())
 
         // Convert bitmap to normalized float tensor
         for (y in 0 until inputHeight) {
@@ -46,17 +47,21 @@ class ImageProcessor<T>(
 //                buffer.put((g - mean[1]) / std[1])
 //                buffer.put((b - mean[2]) / std[2])
 
-                buffer.put(normalized)
-                buffer.put(normalized)
-                buffer.put(normalized)
+                val j = x * y
+                buffer.put(j, normalized)
+                buffer.put(j + inputHeight * inputWidth, normalized)
+                buffer.put(j + 2 * inputHeight * inputWidth, normalized)
+//                buffer.put(normalized)
+//                buffer.put(normalized)
+//                buffer.put(normalized)
             }
         }
+
+//        buffer.flip()
 
         if (resizedBitmap !== bitmap) {
             resizedBitmap.recycle()
         }
-
-        buffer.flip()
 
         // Create tensor with shape [1, 3, 224, 224]
         return floatsToTensor(buffer, shape)

@@ -38,7 +38,7 @@ class OrtMangaOcr private constructor(
                 OnnxTensor.createTensor(
                     OrtEnvironment.getEnvironment(),
                     tokenIds,
-                    longArrayOf(1, tokenIds.limit().toLong()),
+                    longArrayOf(1, tokensCount.toLong()),
                 )
             val outputs = session.run(mapOf("image" to image, "token_ids" to tokenIdsTensor))
             val logitsTensor = outputs.get("logits").get() as OnnxTensor
@@ -51,8 +51,13 @@ class OrtMangaOcr private constructor(
             if (logits.limit() == 0) {
                 throw IllegalStateException("Empty logits")
             }
+            val resultRows = shape[1].toInt()
             val count = shape[2].toInt()
-            val start = count * (shape[1].toInt() - 1)
+            if (resultRows < 1) {
+                throw IllegalStateException("No resultRows")
+            }
+            Log.v("ORT", "Result rows = $resultRows")
+            val start = count * (resultRows - 1)
             val end = start + count
 
             // find argmax
@@ -61,7 +66,7 @@ class OrtMangaOcr private constructor(
             for (i in start until end) {
                 val value = logits.get(i)
                 if (maxTokenId < 0 || value > maxArg) {
-                    Log.v("ORT", "max @$i token $i = $value")
+//                    Log.v("ORT", "max @$i token $i = $value")
                     maxTokenId = (i - start)
 //                    maxTokenId = candidateTokenId
                     maxArg = value
@@ -76,7 +81,8 @@ class OrtMangaOcr private constructor(
             tokenIds.limit(tokensCount + 1)
             tokenIds.position(tokensCount)
             tokenIds.put(maxTokenId.toLong())
-            Log.v("ORT", "Got token $maxTokenId; tokenIds=${tokenIds.array().toList()}")
+            val token = vocab.lookupToken(maxTokenId)
+            Log.v("ORT", "Got token $maxTokenId ($token); tokenIds=${tokenIds.array().take(tokensCount).toList()}")
 
             // Quit on end token
             if (maxTokenId == 3) {
