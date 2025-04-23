@@ -31,14 +31,13 @@ class ImageProcessor<T>(
             for (x in 0 until inputWidth) {
                 val pixel = resizedBitmap.getPixel(x, y)
 
-                // NOTE: This *works* but seems less accurate than the original colors?
-//                // in [0, 1]
+//                // NOTE: This *works* but seems less accurate than the original colors?
+//                // Translate [0, 1] -> [0, 255]
 //                val gray = Color.luminance(pixel) * 255f
 //                val r = gray
 //                val g = gray
 //                val b = gray
 
-                // in [0, 1]
                 val r = Color.red(pixel)
                 val g = Color.green(pixel)
                 val b = Color.blue(pixel)
