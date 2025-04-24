@@ -151,7 +151,7 @@ class OrtMangaOcr private constructor(
                 OrtEnvironment.getEnvironment().createSession(
                     modelPath.absolutePath,
                     OrtSession.SessionOptions().apply {
-                        setExecutionMode(OrtSession.SessionOptions.ExecutionMode.PARALLEL)
+                        setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
                         setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
 
 //                        addXnnpack(emptyMap())
