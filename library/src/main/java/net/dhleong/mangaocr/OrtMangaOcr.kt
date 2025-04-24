@@ -118,14 +118,13 @@ class OrtMangaOcr private constructor(
                 val start = System.currentTimeMillis()
 
                 val ctx = context.applicationContext
-                val repo = HfHubRepo("mayocream/koharu")
                 val session =
                     async {
                         val modelPath =
-                            repo.resolveLocalPath(
+                            HfHubRepo("dhleong/manga-ocr-android").resolveLocalPath(
                                 ctx,
-                                "manga-ocr.onnx",
-                                sha256 = "ac11c392af15df90f07d9a6473c737b7c18fdd31af6756768b6a7886f1fb3be1",
+                                "manga-ocr.quant.onnx",
+                                sha256 = "73ee2e80cdce8f47590cb84486947f3bf0c1587bf46addb9007a7f7469ee332e",
                             )
                         Log.v("ORT", "Prepared model file in ${System.currentTimeMillis() - start} ms")
                         buildSession(modelPath)
@@ -133,7 +132,7 @@ class OrtMangaOcr private constructor(
                 val vocab =
                     async {
                         val vocabPath =
-                            repo.resolveLocalPath(
+                            HfHubRepo("mayocream/koharu").resolveLocalPath(
                                 ctx,
                                 "vocab.txt",
                                 sha256 = "344fbb6b8bf18c57839e924e2c9365434697e0227fac00b88bb4899b78aa594d",
