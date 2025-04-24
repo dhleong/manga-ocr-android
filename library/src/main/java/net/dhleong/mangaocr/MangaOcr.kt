@@ -18,6 +18,9 @@ interface MangaOcr {
     suspend fun process(bitmap: Bitmap): Flow<Result>
 
     companion object {
-        suspend fun initialize(context: Context): MangaOcr = OrtMangaOcr.initialize(context)
+        suspend fun initialize(context: Context): MangaOcr =
+            LoggingMangaOcr(
+                OrtMangaOcr.initialize(context),
+            )
     }
 }

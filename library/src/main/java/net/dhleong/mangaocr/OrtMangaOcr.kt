@@ -62,7 +62,7 @@ class OrtMangaOcr private constructor(
                 if (resultRows < 1) {
                     throw IllegalStateException("No resultRows")
                 }
-                Log.v("ORT", "Result rows = $resultRows")
+
                 val start = count * (resultRows - 1)
                 val end = start + count
 
@@ -152,9 +152,18 @@ class OrtMangaOcr private constructor(
                 OrtEnvironment.getEnvironment().createSession(
                     modelPath.absolutePath,
                     OrtSession.SessionOptions().apply {
-                        setOptimizationLevel(OrtSession.SessionOptions.OptLevel.EXTENDED_OPT)
-//                            setSessionLogLevel(OrtLoggingLevel.ORT_LOGGING_LEVEL_VERBOSE)
+                        setExecutionMode(OrtSession.SessionOptions.ExecutionMode.PARALLEL)
+                        setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+
+//                        addXnnpack(emptyMap())
+//                        addNnapi()
+//                        addCPU(true)
                         setIntraOpNumThreads(4)
+
+                        // This is the recommended xnnpack config, but it's way slower:
+//                        addXnnpack(mapOf("intra_op_num_threads" to "4"))
+//                        addConfigEntry("session.intra_op.allow_spinning", "0")
+//                        setIntraOpNumThreads(1)
                     },
                 )
             }
