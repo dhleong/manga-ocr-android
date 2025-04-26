@@ -1,0 +1,25 @@
+[project]
+name = "manga-ocr-android"
+version = "0.1.0"
+description = "Model dev for manga-ocr-android"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "onnx (>=1.17.0,<2.0.0)",
+    "onnxruntime (>=1.21.1,<2.0.0)",
+    "torch (>=2.7.0,<3.0.0)",
+    "huggingface-hub (>=0.30.2,<0.31.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
+
+packages = [
+    { include = "model-dev" },
+]
+

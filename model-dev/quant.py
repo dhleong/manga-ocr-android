@@ -6,54 +6,75 @@ from onnxruntime.quantization import (
     quant_utils,
     quantize_dynamic,
 )
+from onnxruntime.quantization.preprocess import quant_pre_process
 
 MODE = "dynamic"
 
-model_fp32 = "./opt1.onnx"
+_model_fp32 = "./opt1.onnx"
 
 
-def output_name(variant: str) -> str:
-    return f"manga-ocr.{variant}.onnx"
+def _output_path(input: Path, variant: str) -> Path:
+    base = input.name.removesuffix(".onnx")
+    print("output_name=", base, input.parent)
+    return input.parent / f"{base}.{variant}.onnx"
 
 
-match MODE:
-    case "int4":
-        quant_config = matmul_4bits_quantizer.DefaultWeightOnlyQuantConfig(
-            block_size=128,  # 2's exponential and >= 16
-            is_symmetric=True,  # if true, quantize to Int4. otherwsie, quantize to uint4.
-            accuracy_level=4,  # used by MatMulNbits, see https://github.com/microsoft/onnxruntime/blob/main/docs/ContribOperators.md#attributes-35
-            quant_format=quant_utils.QuantFormat.QOperator,
-            op_types_to_quantize=(
-                "MatMul",
-                "Gather",
-            ),  # specify which op types to quantize
-            quant_axes=(("MatMul", 0), ("Gather", 1)),
-        )
+def preprocess(input: Path):
+    output = _output_path(input, "preprocessed")
+    print(f"Prepreocess {input} -> {output}")
+    quant_pre_process(input, output)
+    return output
 
-        model = quant_utils.load_model_with_shape_infer(Path(model_fp32))
-        quant = matmul_4bits_quantizer.MatMul4BitsQuantizer(
-            model, algo_config=quant_config
-        )
-        quant.process()
-        quant.model.save_model_to_file(output_name("int4"))
 
-    case "dynamic":
-        quantize_dynamic(
-            model_fp32,
-            output_name("quant"),
-            weight_type=QuantType.QInt8,
-            nodes_to_exclude=[
-                "/encoder/embeddings/patch_embeddings/projection/Conv_quant"
-            ],
-            op_types_to_quantize=[
-                "MatMul",
-                "Attention",
-                "LSTM",
-                "Gather",
-                "Transpose",
-                "EmbedLayerNormalization",
-            ],
-        )
+def int4(input: Path) -> Path:
+    quant_config = matmul_4bits_quantizer.DefaultWeightOnlyQuantConfig(
+        block_size=128,  # 2's exponential and >= 16
+        is_symmetric=True,  # if true, quantize to Int4. otherwsie, quantize to uint4.
+        accuracy_level=4,  # used by MatMulNbits, see https://github.com/microsoft/onnxruntime/blob/main/docs/ContribOperators.md#attributes-35
+        quant_format=quant_utils.QuantFormat.QOperator,
+        op_types_to_quantize=(
+            "MatMul",
+            "Gather",
+        ),  # specify which op types to quantize
+        quant_axes=(("MatMul", 0), ("Gather", 1)),
+    )
 
-    case _:
-        raise Exception("Invalid mode")
+    model = quant_utils.load_model_with_shape_infer(input)
+    quant = matmul_4bits_quantizer.MatMul4BitsQuantizer(model, algo_config=quant_config)
+    quant.process()
+
+    output = _output_path(input, "int4")
+    quant.model.save_model_to_file(output)
+    return output
+
+
+def dynamic(input: Path) -> Path:
+    output = _output_path(input, "quant")
+    print(f"Performing dynamic quant {input} -> {output}")
+    quantize_dynamic(
+        input,
+        output,
+        weight_type=QuantType.QInt8,
+        nodes_to_exclude=["/encoder/embeddings/patch_embeddings/projection/Conv_quant"],
+        op_types_to_quantize=[
+            "MatMul",
+            "Attention",
+            "LSTM",
+            "Gather",
+            "Transpose",
+            "EmbedLayerNormalization",
+        ],
+    )
+    return output
+
+
+if __name__ == "__main__":
+    match MODE:
+        case "int4":
+            int4(Path(_model_fp32))
+
+        case "dynamic":
+            dynamic(Path(_model_fp32))
+
+        case _:
+            raise Exception("Invalid mode")
