@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.graphics.applyCanvas
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
 import coil3.request.ImageRequest
@@ -32,6 +33,7 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
@@ -40,13 +42,16 @@ import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
 private const val USE_REAL_IMAGE = true
 
 class MainActivity : ComponentActivity() {
-    private lateinit var manager: MangaOcrManager
+    private val manager: MangaOcrManager by lazy {
+        MangaOcrManager(this, lifecycleScope, lifecycle)
+    }
+    private val detector: Detector by lazy {
+        DetectorManager(this, lifecycleScope, lifecycle)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        manager = MangaOcrManager(this, lifecycleScope, lifecycle)
 
         setContent {
             var lastBitmap: Bitmap? by remember { mutableStateOf(null) }
@@ -76,6 +81,12 @@ class MainActivity : ComponentActivity() {
                         } else {
                             Button(onClick = { process(0, onLoading, onBitmap, onResult) }) {
                                 Text("Hi")
+                            }
+                        }
+
+                        Row {
+                            Button(onClick = { processDetection(onLoading, onBitmap, onResult) }) {
+                                Text("Detect")
                             }
                         }
 
@@ -120,18 +131,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 } else {
-                    val imageResult =
-                        ImageLoader(this@MainActivity).execute(
-                            ImageRequest
-                                .Builder(this@MainActivity)
-                                .data(
-                                    "https://github.com/kha-white/manga-ocr/raw/master/assets/examples/0$index.jpg",
-                                ).allowHardware(false)
-                                .build(),
-                        )
-                    val image = (imageResult as SuccessResult).image
-                    Log.v("OCR", "Loaded $image @ ${image.width} x ${image.height}")
-                    image.toBitmap()
+                    loadBitmap("https://github.com/kha-white/manga-ocr/raw/master/assets/examples/0$index.jpg")
                 }
 
             setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(224, 224))
@@ -154,6 +154,64 @@ class MainActivity : ComponentActivity() {
             setLoading(false)
         }
     }
+
+    private fun processDetection(
+        setLoading: (Boolean) -> Unit,
+        setBitmap: (Bitmap) -> Unit,
+        setResult: (CharSequence) -> Unit,
+    ) {
+        lifecycleScope.launch {
+            setLoading(true)
+
+            val bitmap = loadBitmap("https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg")
+            setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(1024, 1024))
+
+            val boxes = detector.process(bitmap)
+            setBitmap(
+                bitmap.mutate().applyCanvas {
+                    for (box in boxes) {
+                        drawRect(
+                            box.bbox.rect,
+                            Paint().apply {
+                                color =
+                                    if (box.classIndex == 0) {
+                                        0xffff0000.toInt()
+                                    } else {
+                                        0xff00ff00.toInt()
+                                    }
+                                style = Paint.Style.STROKE
+                            },
+                        )
+                    }
+                },
+            )
+            setResult("Done.")
+
+            setLoading(false)
+        }
+    }
+
+    suspend fun loadBitmap(url: String): Bitmap {
+        val imageResult =
+            ImageLoader(this@MainActivity).execute(
+                ImageRequest
+                    .Builder(this@MainActivity)
+                    .data(url)
+                    .allowHardware(false)
+                    .build(),
+            )
+        val image = (imageResult as SuccessResult).image
+        Log.v("OCR", "Loaded $image @ ${image.width} x ${image.height}")
+        return image.toBitmap()
+    }
+}
+
+private fun Bitmap.mutate(): Bitmap {
+    if (isMutable) {
+        return this
+    }
+
+    return copy(Bitmap.Config.ARGB_8888, true)
 }
 
 @Composable

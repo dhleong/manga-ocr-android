@@ -13,8 +13,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.hub.HfHubRepo
+import net.dhleong.mangaocr.onnx.createSession
 import java.io.File
 import java.nio.LongBuffer
 
@@ -147,24 +147,20 @@ class OrtMangaOcr private constructor(
             }
 
         private suspend fun buildSession(modelPath: File): OrtSession =
-            withContext(Dispatchers.IO) {
-                OrtEnvironment.getEnvironment().createSession(
-                    modelPath.absolutePath,
-                    OrtSession.SessionOptions().apply {
-                        setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
-                        setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            createSession(modelPath) {
+                setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
+                setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
 
-//                        addXnnpack(emptyMap())
-//                        addNnapi()
-//                        addCPU(true)
-                        setIntraOpNumThreads(4)
+//                addXnnpack(emptyMap())
+//                addNnapi()
+//                addCPU(true)
+                Log.v("ORT", "procs=${Runtime.getRuntime().availableProcessors()}")
+                setIntraOpNumThreads(Runtime.getRuntime().availableProcessors().coerceAtMost(4))
 
-                        // This is the recommended xnnpack config, but it's way slower:
+                // This is the recommended xnnpack config, but it's way slower:
 //                        addXnnpack(mapOf("intra_op_num_threads" to "4"))
 //                        addConfigEntry("session.intra_op.allow_spinning", "0")
 //                        setIntraOpNumThreads(1)
-                    },
-                )
             }
     }
 }

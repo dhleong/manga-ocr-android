@@ -5,18 +5,17 @@ import android.graphics.Bitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleCoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
-class MangaOcrManager(
+class DetectorManager(
     context: Context,
     scope: LifecycleCoroutineScope,
     lifecycle: Lifecycle,
-) : BaseManager<MangaOcr>(context, scope, lifecycle),
-    MangaOcr {
-    override suspend fun initialize(context: Context): MangaOcr = MangaOcr.initialize(context)
+) : BaseManager<Detector>(context, scope, lifecycle),
+    Detector {
+    override suspend fun initialize(context: Context): Detector = Detector.initialize(context)
 
-    override suspend fun process(bitmap: Bitmap): Flow<MangaOcr.Result> {
+    override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
         val model = awaitModel()
         return withContext(Dispatchers.IO) {
             model.process(bitmap)
