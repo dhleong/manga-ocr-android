@@ -19,8 +19,6 @@ import java.io.File
 
 class OrtComicTextDetector private constructor(
     private val session: OrtSession,
-    // NOTE: Currently this drops boxes unexpectedly
-    private val performNonMaxSuppression: Boolean = false,
     private val processor: ImageProcessor<OnnxTensorLike> =
         ImageProcessor(
             inputWidth = 1024,
@@ -68,20 +66,21 @@ class OrtComicTextDetector private constructor(
                 boxes[classIndex] += Bbox(rect, confidence)
             }
 
-            val filtered =
-                if (performNonMaxSuppression) {
-                    nonMaximumSuppression(boxes, threshold = NMS_THRESHOLD)
-                } else {
-                    boxes
+            nonMaximumSuppression(boxes, threshold = NMS_THRESHOLD)
+                .flatMapIndexed { i, classBoxes ->
+                    classBoxes.asSequence().map { Detector.Result(it, classIndex = i) }
+                }.also { flattened ->
+                    Log.v("OrtComicTextDetector", "Filtered ${boxes.sumOf { it.size }} -> ${flattened.size} boxes")
                 }
-            filtered.flatMapIndexed { i, classBoxes ->
-                classBoxes.asSequence().map { Detector.Result(it, classIndex = i) }
-            }
         }
 
     companion object {
         private const val CONFIDENCE_THRESHOLD = 0.5f
-        private const val NMS_THRESHOLD = 0.5f
+
+        // NOTE: We only want to remove maximally-similar/overlapping boxes, so
+        // this threshold is pretty high. Koharu sets this to 0.5, but that low
+        // actually *drops* legit boxes for some reason (try it in the sample app!)
+        private const val NMS_THRESHOLD = 0.75f
 
         suspend fun initialize(context: Context): Detector {
             val start = System.currentTimeMillis()
