@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import net.dhleong.mangaocr.hub.HfHubRepo
+import net.dhleong.mangaocr.ocr.findMaxArg
 import net.dhleong.mangaocr.onnx.createSession
 import java.io.File
 import java.nio.LongBuffer
@@ -66,23 +67,7 @@ class OrtMangaOcr private constructor(
                 val start = count * (resultRows - 1)
                 val end = start + count
 
-                // find argmax
-                var maxTokenId = -1
-                var maxArg = 0f
-                for (i in start until end) {
-                    val value = logits.get(i)
-                    if (maxTokenId < 0 || value > maxArg) {
-//                    Log.v("ORT", "max @$i token $i = $value")
-                        maxTokenId = (i - start)
-//                    maxTokenId = candidateTokenId
-                        maxArg = value
-                    }
-//                candidateTokenId += 1
-                }
-
-                if (maxTokenId < 0) {
-                    throw IllegalStateException("No max token found")
-                }
+                val maxTokenId = logits.findMaxArg(start, end)
 
                 tokenIds.limit(tokensCount + 1)
                 tokenIds.position(tokensCount)

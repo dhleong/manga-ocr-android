@@ -39,6 +39,7 @@ android {
 dependencies {
     implementation(libs.executorch)
     implementation(libs.ort)
+    implementation(libs.bundles.tflite)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

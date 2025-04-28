@@ -3,6 +3,7 @@ package net.dhleong.mangaocr
 import android.content.Context
 import android.graphics.Bitmap
 import kotlinx.coroutines.flow.Flow
+import net.dhleong.mangaocr.ocr.TfliteMangaOcr
 
 interface MangaOcr {
     sealed interface Result {
@@ -18,9 +19,15 @@ interface MangaOcr {
     suspend fun process(bitmap: Bitmap): Flow<Result>
 
     companion object {
+        private const val USE_ORT = false
+
         suspend fun initialize(context: Context): MangaOcr =
             LoggingMangaOcr(
-                OrtMangaOcr.initialize(context),
+                if (USE_ORT) {
+                    OrtMangaOcr.initialize(context)
+                } else {
+                    TfliteMangaOcr.initialize(context)
+                },
             )
     }
 }
