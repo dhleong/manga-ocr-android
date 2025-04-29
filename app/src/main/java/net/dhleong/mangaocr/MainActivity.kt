@@ -1,6 +1,8 @@
 package net.dhleong.mangaocr
 
+import android.content.ClipboardManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.Bundle
@@ -25,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.getSystemService
 import androidx.core.graphics.applyCanvas
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
@@ -38,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
+import okio.use
 
 private const val USE_REAL_IMAGE = true
 
@@ -87,6 +91,10 @@ class MainActivity : ComponentActivity() {
                         Row {
                             Button(onClick = { processDetection(onLoading, onBitmap, onResult) }) {
                                 Text("Detect")
+                            }
+
+                            Button(onClick = { detectClipboard(onLoading, onBitmap, onResult) }) {
+                                Text("Detect Clipboard")
                             }
                         }
 
@@ -155,15 +163,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun processDetection(
+    private fun detectClipboard(
         setLoading: (Boolean) -> Unit,
         setBitmap: (Bitmap) -> Unit,
         setResult: (CharSequence) -> Unit,
     ) {
+        val service = requireNotNull(getSystemService<ClipboardManager>())
+        val clip = service.primaryClip ?: return
+        for (i in 0 until clip.itemCount) {
+            val item = clip.getItemAt(i).uri ?: continue
+            contentResolver.openInputStream(item).use { input ->
+                val bitmap = BitmapFactory.decodeStream(input)
+                processDetection(setLoading, setBitmap, setResult, bitmap)
+                return
+            }
+        }
+    }
+
+    private fun processDetection(
+        setLoading: (Boolean) -> Unit,
+        setBitmap: (Bitmap) -> Unit,
+        setResult: (CharSequence) -> Unit,
+        bitmap: Bitmap? = null,
+    ) {
         lifecycleScope.launch {
             setLoading(true)
 
-            val bitmap = loadBitmap("https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg")
+            val bitmap = bitmap ?: loadBitmap("https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg")
             setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(1024, 1024))
 
             val boxes = detector.process(bitmap)

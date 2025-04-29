@@ -77,10 +77,7 @@ class OrtComicTextDetector private constructor(
     companion object {
         private const val CONFIDENCE_THRESHOLD = 0.5f
 
-        // NOTE: We only want to remove maximally-similar/overlapping boxes, so
-        // this threshold is pretty high. Koharu sets this to 0.5, but that low
-        // actually *drops* legit boxes for some reason (try it in the sample app!)
-        private const val NMS_THRESHOLD = 0.75f
+        private const val NMS_THRESHOLD = 0.5f
 
         suspend fun initialize(context: Context): Detector {
             val start = System.currentTimeMillis()
