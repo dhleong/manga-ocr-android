@@ -56,10 +56,11 @@ class TfliteMangaOcr private constructor(
             val outputTokens = FloatBuffer.allocate(vocab.size)
 
             for (i in 0 until interpreter.inputTensorCount) {
-                println("@$i: ${interpreter.getInputTensor(i).name()}")
+                val t = interpreter.getInputTensor(i)
+                Log.v("OCR", "@$i: ${t.name()} @ ${t.numElements()} (shape=${t.shape().toList()})")
             }
 
-            println("inputs=${image.buffer} / ${tokenIds.array()}")
+            Log.v("OCR", "inputs=${image.buffer} / ${tokenIds.array()}")
             for (tokensCount in 1 until 80) {
                 tokenIds.flip()
                 val outputs = mutableMapOf<Int, Any>(logitsIdx to outputTokens)

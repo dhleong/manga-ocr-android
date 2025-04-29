@@ -83,13 +83,13 @@ tf-nightly = ">=2.17.0.dev20240509"
 
 [[package]]
 name = "ai-edge-torch-nightly"
-version = "0.5.0.dev20250427"
+version = "0.5.0.dev20250428"
 description = "Supporting PyTorch models with the Google AI Edge TFLite runtime."
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "ai_edge_torch_nightly-0.5.0.dev20250427-py3-none-any.whl", hash = "sha256:c737460c064436530213fbef9b8d6127d1c547ca99a01f471780d24ef4976675"},
+    {file = "ai_edge_torch_nightly-0.5.0.dev20250428-py3-none-any.whl", hash = "sha256:efde0b986531a622fe9b28ca2c313bd64413a7c7052b865f4797194d5e7f5d5f"},
 ]
 
 [package.dependencies]
