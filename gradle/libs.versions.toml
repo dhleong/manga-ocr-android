@@ -11,6 +11,8 @@ composeBom = "2024.04.01"
 
 executorch = "0.6.0-rc1"
 ort = "1.21.0"
+gps-tflite = "16.4.0"
+tflite = "0.4.0"
 
 coil = "3.1.0"
 
@@ -34,6 +36,15 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+tflite-java = { group = "com.google.android.gms", name = "play-services-tflite-java", version.ref = "gps-tflite" }
+tflite-gpu = { group = "com.google.android.gms", name = "play-services-tflite-gpu", version.ref = "gps-tflite" }
+tflite-support = { group = "com.google.android.gms", name = "play-services-tflite-support", version.ref = "gps-tflite" }
+
+tflite-task-vision = { group = "org.tensorflow", name = "tensorflow-lite-task-vision", version.ref = "tflite" }
+
+[bundles]
+tflite = ["tflite-gpu", "tflite-java", "tflite-support", "tflite-task-vision"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

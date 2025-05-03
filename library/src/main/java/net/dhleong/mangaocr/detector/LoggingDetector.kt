@@ -11,7 +11,7 @@ class LoggingDetector(
         val start = System.currentTimeMillis()
         val result = delegate.process(bitmap)
         val total = System.currentTimeMillis() - start
-        Log.v("Detector", "Detected in $total ms: $result")
+        Log.v("Detector", "Detected (${result.size}) in $total ms: $result")
         return result
     }
 }
