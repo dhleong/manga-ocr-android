@@ -4,14 +4,16 @@ import quant
 from huggingface_hub import hf_hub_download
 
 KOHARU = "mayocream/koharu"
+OUTPUTS = Path("./model-dev/outputs")
 
 
 def _download(repo: str, file: str):
     print(f"Downloading {repo}/{file}...")
-    hf_hub_download(repo, file, local_dir="./model-dev")
+    hf_hub_download(repo, file, local_dir=OUTPUTS)
 
 
 def download_base_models():
+    OUTPUTS.mkdir(parents=True)
     _download(KOHARU, "manga-ocr.onnx")
     _download(KOHARU, "comictextdetector.onnx")
 
@@ -19,5 +21,5 @@ def download_base_models():
 if __name__ == "__main__":
     download_base_models()
 
-    processed = quant.preprocess(Path("model-dev/comictextdetector.onnx"))
+    processed = quant.preprocess(OUTPUTS / "comictextdetector.onnx")
     quant.dynamic(processed)
