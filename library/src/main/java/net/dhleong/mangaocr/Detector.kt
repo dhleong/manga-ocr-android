@@ -2,6 +2,8 @@ package net.dhleong.mangaocr
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
+import com.google.android.gms.dynamite.DynamiteModule.LoadingException
 import net.dhleong.mangaocr.detector.Bbox
 import net.dhleong.mangaocr.detector.LoggingDetector
 import net.dhleong.mangaocr.detector.OrtComicTextDetector
@@ -16,13 +18,23 @@ interface Detector {
     )
 
     companion object {
-        private const val USE_TFLITE = true
-
-        suspend fun initialize(context: Context): Detector =
+        suspend fun initialize(
+            context: Context,
+            fallback: Boolean = true,
+        ): Detector =
             LoggingDetector(
-                if (USE_TFLITE) {
+                try {
                     TfliteMangaTextDetector.initialize(context)
-                } else {
+                } catch (e: LoadingException) {
+                    if (!fallback) {
+                        throw e
+                    }
+
+                    Log.w(
+                        "manga-ocr-android",
+                        "Failed to initialize tflite detector; falling back",
+                        e,
+                    )
                     OrtComicTextDetector.initialize(context)
                 },
             )
