@@ -64,7 +64,6 @@ class TfliteMangaTextDetector(
         return output.indices.mapNotNull { i ->
             val confidence = output[0, i, 4]
             if (confidence < CONFIDENCE_THRESHOLD) {
-                Log.v("TfliteDetector", "confidence too low: $confidence")
                 return@mapNotNull null
             }
 
@@ -88,15 +87,29 @@ class TfliteMangaTextDetector(
             val sha256: String,
         )
 
-        private val MODEL_FLOAT32 =
+        @Suppress("unused")
+        val MODEL_FLOAT32 =
             ModelPath(
                 path = "manga-text-detector_float32.tflite",
                 sha256 = "cc8f6894424cebaeda7b3950004b77838967ba28e6d3b01bf94025689eebde40",
             )
 
+        @Suppress("unused")
+        val MODEL_FLOAT16 =
+            ModelPath(
+                path = "manga-text-detector_float16.tflite",
+                sha256 = "ede78ec00d546528e85a743c65b4c7f1614b7271526149434674656f6e7c8ce1",
+            )
+
+        private val MODEL_INT8 =
+            ModelPath(
+                path = "manga-text-detector_int8.tflite",
+                sha256 = "2c8a423844cfb4707f26a1e0d493a8919315a2dfea079c2f1fdb5cf8e55a1f60",
+            )
+
         suspend fun initialize(
             context: Context,
-            model: ModelPath = MODEL_FLOAT32,
+            model: ModelPath = MODEL_INT8,
         ): Detector =
             coroutineScope {
                 val modelFile =
