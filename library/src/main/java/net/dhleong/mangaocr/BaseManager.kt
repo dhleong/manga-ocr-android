@@ -32,10 +32,13 @@ abstract class BaseManager<T>(
 
     init {
         scope.launch {
+            Log.v("BaseManager", "launching lifecycle scope")
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                Log.v("BaseManager", "resumed")
                 try {
                     maybeInit()
                 } catch (e: IOException) {
+                    Log.w("BaseManager", "Failed to eagerly initialize manager", e)
                     return@repeatOnLifecycle
                 }
             }
@@ -50,7 +53,10 @@ abstract class BaseManager<T>(
         when (val existing = model.getAndUpdate { it ?: State.Loading }) {
             null, is State.Error -> {
                 try {
+                    val start = System.currentTimeMillis()
                     val newModel = initialize(context)
+                    Log.v("BaseManager", "initialized $newModel in ${System.currentTimeMillis() - start}ms")
+
                     model.set(State.Loaded(newModel))
                     modelLoaded.emit(newModel)
                     newModel

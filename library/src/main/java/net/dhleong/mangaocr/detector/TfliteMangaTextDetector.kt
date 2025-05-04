@@ -19,10 +19,10 @@ import org.tensorflow.lite.support.image.ops.ResizeOp
 
 class TfliteMangaTextDetector(
     private val interpreter: InterpreterApi,
+    private val targetWidth: Int = 640,
+    private val targetHeight: Int = 640,
 ) : Detector {
     override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
-        val targetWidth = 640
-        val targetHeight = 640
         val imageProcessor =
             ImageProcessor
                 .Builder()
