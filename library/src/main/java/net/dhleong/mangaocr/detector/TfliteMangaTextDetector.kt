@@ -46,16 +46,13 @@ class TfliteMangaTextDetector(
                 .Builder()
                 .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
                 .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
-//                .add(NormalizeOp(127.5f, 127.5f)) // [ -0.5, 0.5 ]
                 .build()
         val processed = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
-        // NOTE: The coord *appear* to be a percentage of the input dimension, so:
-        //   coordPercent * inputWidth * (originalWidth / inputWidth)
-        // cancels out to `coordPercent * originalWidth` to get the "real" dimens.
-        // Unfortunately getting garbage output using this buuuut...
-        val widthRatio = bitmap.width
-        val heightRatio = bitmap.height
+        // The YOLO model seems to output in xyxyn format,
+        // IE: normalized within the *original* width
+        val ratioX = bitmap.width
+        val ratioY = bitmap.height
 
         val outputTensor = interpreter.getOutputTensor(0)
         Log.v("TfliteDetector", "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
@@ -67,23 +64,24 @@ class TfliteMangaTextDetector(
         return output.indices.mapNotNull { i ->
             val confidence = output[0, i, 4]
             if (confidence < CONFIDENCE_THRESHOLD) {
+                Log.v("TfliteDetector", "confidence too low: $confidence")
                 return@mapNotNull null
             }
 
-            val centerX = output[0, i, 0] * widthRatio
-            val centerY = output[0, i, 1] * heightRatio
-            val width = output[0, i, 2] * widthRatio
-            val height = output[0, i, 3] * heightRatio
+            val left = output[0, i, 0] * ratioX
+            val top = output[0, i, 1] * ratioY
+            val right = output[0, i, 2] * ratioX
+            val bottom = output[0, i, 3] * ratioY
 
             Detector.Result(
-                bbox = Bbox(RectF(centerX - width / 2, centerY - height / 2, centerX + width / 2, centerY + height / 2), confidence),
+                bbox = Bbox(RectF(left, top, right, bottom), confidence),
                 classIndex = output[0, i, 5].toInt(),
             )
         }
     }
 
     companion object {
-        private const val CONFIDENCE_THRESHOLD = 0.5f
+        private const val CONFIDENCE_THRESHOLD = 0.05f
 
         data class ModelPath(
             val path: String,

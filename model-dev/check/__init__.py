@@ -15,4 +15,7 @@ def yolo():
     results = model(
         "https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg"
     )
-    results[0].show()
+    result = results[0]
+    print(result.__dict__)
+    print(result.boxes)
+    result.show()
