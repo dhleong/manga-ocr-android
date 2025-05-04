@@ -1,25 +1,17 @@
-from pathlib import Path
-
-import quant
-from huggingface_hub import hf_hub_download
-
-KOHARU = "mayocream/koharu"
-OUTPUTS = Path("./model-dev/outputs")
+import click
+from check import check
+from convert import convert
+from quant import quantize
 
 
-def _download(repo: str, file: str):
-    print(f"Downloading {repo}/{file}...")
-    hf_hub_download(repo, file, local_dir=OUTPUTS)
+@click.group()
+def cli(): ...
 
 
-def download_base_models():
-    OUTPUTS.mkdir(parents=True)
-    _download(KOHARU, "manga-ocr.onnx")
-    _download(KOHARU, "comictextdetector.onnx")
+cli.add_command(check)
+cli.add_command(convert)
+cli.add_command(quantize)
 
 
 if __name__ == "__main__":
-    download_base_models()
-
-    processed = quant.preprocess(OUTPUTS / "comictextdetector.onnx")
-    quant.dynamic(processed)
+    cli()

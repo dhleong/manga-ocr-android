@@ -199,6 +199,7 @@ class MainActivity : ComponentActivity() {
                         drawRect(
                             box.bbox.rect,
                             Paint().apply {
+                                strokeWidth = 2f * resources.displayMetrics.density
                                 color =
                                     if (box.classIndex == 0) {
                                         0xffff0000.toInt()

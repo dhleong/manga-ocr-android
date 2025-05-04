@@ -65,6 +65,7 @@ def dynamic(input: Path) -> Path:
             "EmbedLayerNormalization",
         ],
     )
+    print(output.name, ":", output.stat().st_size)
     return output
 
 

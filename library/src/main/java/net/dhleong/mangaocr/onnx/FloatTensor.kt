@@ -2,12 +2,33 @@ package net.dhleong.mangaocr.onnx
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OnnxValue
+import org.tensorflow.lite.InterpreterApi
+import java.nio.FloatBuffer
 
 class FloatTensor(
-    tensor: OnnxTensor,
+    val buffer: FloatBuffer,
+    private val shape: IntArray,
+    val rowsCount: Int,
 ) {
-    private val buffer = requireNotNull(tensor.floatBuffer)
-    val shape = tensor.info.shape
+    val indices: IntRange
+        get() = IntRange(0, (rowsCount - 1).coerceAtLeast(0))
+
+    inline fun <T> mapRows(
+        quitEarlyOnNull: Boolean = true,
+        transform: (row: Int) -> T?,
+    ): List<T> {
+        val result = mutableListOf<T>()
+        for (row in 0 until rowsCount) {
+            val transformed = transform(row)
+            when {
+                transformed == null && quitEarlyOnNull ->
+                    return result
+                transformed != null ->
+                    result.add(transformed)
+            }
+        }
+        return result
+    }
 
     operator fun get(
         x: Int,
@@ -15,13 +36,39 @@ class FloatTensor(
         z: Int,
     ): Float {
         val i =
-            x * shape[1].toInt() * shape[2].toInt() +
-                y * shape[2].toInt() +
+            x * shape[1] * shape[2] +
+                y * shape[2] +
                 z
         return buffer.get(i)
     }
 
     companion object {
-        fun from(tensor: OnnxValue) = FloatTensor(tensor as OnnxTensor)
+        fun from(
+            tensor: OnnxValue,
+            rowsCountIndex: Int = 1,
+        ): FloatTensor {
+            val onnxTensor = tensor as OnnxTensor
+            return FloatTensor(
+                requireNotNull(onnxTensor.floatBuffer),
+                IntArray(onnxTensor.info.shape.size) { i ->
+                    onnxTensor.info.shape[i].toInt()
+                },
+                rowsCount = onnxTensor.info.shape[rowsCountIndex].toInt(),
+            )
+        }
+
+        fun InterpreterApi.allocateFloatOutputTensor(
+            outputIndex: Int = 0,
+            rowsCountIndex: Int = 1,
+        ): FloatTensor {
+            val tensor = getOutputTensor(outputIndex)
+            val shape = tensor.shape()
+            val buffer = FloatBuffer.allocate(shape.reduce { acc, i -> acc * i })
+            return FloatTensor(
+                buffer,
+                shape,
+                rowsCount = shape[rowsCountIndex],
+            )
+        }
     }
 }

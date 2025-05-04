@@ -16,13 +16,16 @@ import net.dhleong.mangaocr.hub.HfHubRepo
 import net.dhleong.mangaocr.onnx.FloatTensor
 import net.dhleong.mangaocr.onnx.createSession
 import java.io.File
+import kotlin.jvm.optionals.getOrNull
 
 class OrtComicTextDetector private constructor(
     private val session: OrtSession,
+    inputWidth: Int = 1024,
+    inputHeight: Int = 1024,
     private val processor: ImageProcessor<OnnxTensorLike> =
         ImageProcessor(
-            inputWidth = 1024,
-            inputHeight = 1024,
+            inputWidth = inputWidth,
+            inputHeight = inputHeight,
             normalize = { it }, // no-op
             grayscaleify = false,
         ) { floats, shape ->
@@ -35,11 +38,15 @@ class OrtComicTextDetector private constructor(
             val widthRatio = bitmap.width / image.info.shape[2].toFloat()
             val heightRatio = bitmap.height / image.info.shape[3].toFloat()
 
+            Log.v("ORT", "${session.inputNames} -> ${session.outputNames}")
             val outputs = session.run(mapOf("images" to image))
-            val blocks = FloatTensor.from(outputs.get("blk").get())
+            val output =
+                outputs.get("blk").getOrNull()
+                    ?: outputs.get("output0").get()
+            val blocks = FloatTensor.from(output)
 
             val boxes: List<MutableList<Bbox>> = listOf(mutableListOf(), mutableListOf())
-            for (i in 0 until blocks.shape[1].toInt()) {
+            for (i in blocks.indices) {
                 val confidence = blocks[0, i, 4]
                 if (confidence < CONFIDENCE_THRESHOLD) {
                     continue
@@ -76,20 +83,46 @@ class OrtComicTextDetector private constructor(
 
     companion object {
         private const val CONFIDENCE_THRESHOLD = 0.5f
-
         private const val NMS_THRESHOLD = 0.5f
 
+        private const val USE_MANGA_DETECTOR = false
+
         suspend fun initialize(context: Context): Detector {
-            val start = System.currentTimeMillis()
             val ctx = context.applicationContext
-            val modelPath =
+            return if (USE_MANGA_DETECTOR) {
+                // TODO: We may need some different approach to extracting Bboxes
+                initializeMangaTextDetector(ctx)
+            } else {
+                initializeComicTextDetector(ctx)
+            }
+        }
+
+        private suspend fun initializeComicTextDetector(context: Context) =
+            initializeFromPath {
                 HfHubRepo("dhleong/manga-ocr-android").resolveLocalPath(
-                    ctx,
+                    context,
                     "comictextdetector.preprocessed.quant.onnx",
                     sha256 = "7378ce5a6b01c1953d794b404ec1ce92f7a0f71cd9ed15eec753a61e1707d8e5",
                 )
+            }
+
+        private suspend fun initializeMangaTextDetector(context: Context) =
+            initializeFromPath(inputSize = 640) {
+                HfHubRepo("dhleong/manga-ocr-android").resolveLocalPath(
+                    context,
+                    "manga-text-detector.onnx",
+                    sha256 = "92403c26623702d0938acda6bef5e3dff245529499e8610a5d6c3cea5b0b2455",
+                )
+            }
+
+        private suspend fun initializeFromPath(
+            inputSize: Int = 1024,
+            resolvePath: suspend () -> File,
+        ): Detector {
+            val start = System.currentTimeMillis()
+            val modelPath = resolvePath()
             Log.v("OrtComicTextDetector", "Prepared model file in ${System.currentTimeMillis() - start} ms")
-            return OrtComicTextDetector(buildSession(modelPath))
+            return OrtComicTextDetector(buildSession(modelPath), inputWidth = inputSize, inputHeight = inputSize)
         }
 
         private suspend fun buildSession(modelPath: File) =
