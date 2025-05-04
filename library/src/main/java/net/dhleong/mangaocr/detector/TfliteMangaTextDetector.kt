@@ -43,10 +43,10 @@ class TfliteMangaTextDetector(
         interpreter.run(processed.buffer, output.buffer)
         Log.v("TfliteDetector", "output: ${output.buffer.array().toList()}")
 
-        return output.indices.mapNotNull { i ->
+        return output.mapRows { i ->
             val confidence = output[0, i, 4]
             if (confidence < CONFIDENCE_THRESHOLD) {
-                return@mapNotNull null
+                return@mapRows null
             }
 
             val left = output[0, i, 0] * ratioX

@@ -13,6 +13,23 @@ class FloatTensor(
     val indices: IntRange
         get() = IntRange(0, (rowsCount - 1).coerceAtLeast(0))
 
+    inline fun <T> mapRows(
+        quitEarlyOnNull: Boolean = true,
+        transform: (row: Int) -> T?,
+    ): List<T> {
+        val result = mutableListOf<T>()
+        for (row in 0 until rowsCount) {
+            val transformed = transform(row)
+            when {
+                transformed == null && quitEarlyOnNull ->
+                    return result
+                transformed != null ->
+                    result.add(transformed)
+            }
+        }
+        return result
+    }
+
     operator fun get(
         x: Int,
         y: Int,
