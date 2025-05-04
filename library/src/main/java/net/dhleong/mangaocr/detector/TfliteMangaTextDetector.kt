@@ -18,26 +18,8 @@ import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
 
 class TfliteMangaTextDetector(
-//    private val objectDetector: ObjectDetector,
     private val interpreter: InterpreterApi,
 ) : Detector {
-//    override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
-//        val imageProcessor =
-//            ImageProcessor
-//                .Builder()
-//                .add(ResizeOp(640, 640, ResizeOp.ResizeMethod.BILINEAR))
-//                .build()
-//        val tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
-//        val results = objectDetector.detect(tensorImage)
-//        return results.map { result ->
-//            Log.v("TfliteDetector", "found ${result.categories[0].label} ${result.categories[0].score}")
-//            Detector.Result(
-//                classIndex = result.categories[0].index,
-//                bbox = Bbox(result.boundingBox, result.categories[0].score),
-//            )
-//        }
-//    }
-
     override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
         val targetWidth = 640
         val targetHeight = 640
@@ -125,26 +107,6 @@ class TfliteMangaTextDetector(
                     async {
                         TfLite.initialize(context).await()
                     }
-
-//                val options =
-//                    ObjectDetector.ObjectDetectorOptions.builder().apply {
-//                        setScoreThreshold(0.5f)
-//                        setBaseOptions(
-//                            BaseOptions
-//                                .builder()
-//                                .apply {
-//                                    setNumThreads(4)
-//                                    useNnapi()
-//                                }.build(),
-//                        )
-//                    }
-//
-//                val detector = ObjectDetector.createFromFileAndOptions(modelFile, options.build())
-//
-//                TfliteMangaTextDetector(detector)
-                // NOTE: ObjectDetector complains about needing metadata. See here:
-                // https://ai.google.dev/edge/litert/models/metadata_writer_tutorial#object_detectors
-                // Sadly, tflite-support won't install on my mac :(
 
                 initialized.await()
                 val interpreter =

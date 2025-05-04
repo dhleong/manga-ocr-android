@@ -41,10 +41,8 @@ tflite-java = { group = "com.google.android.gms", name = "play-services-tflite-j
 tflite-gpu = { group = "com.google.android.gms", name = "play-services-tflite-gpu", version.ref = "gps-tflite" }
 tflite-support = { group = "com.google.android.gms", name = "play-services-tflite-support", version.ref = "gps-tflite" }
 
-tflite-task-vision = { group = "org.tensorflow", name = "tensorflow-lite-task-vision", version.ref = "tflite" }
-
 [bundles]
-tflite = ["tflite-gpu", "tflite-java", "tflite-support", "tflite-task-vision"]
+tflite = ["tflite-gpu", "tflite-java", "tflite-support"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
