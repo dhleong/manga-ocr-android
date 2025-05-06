@@ -125,6 +125,8 @@ class OrtMangaOcr private constructor(
                                 ctx,
                                 "manga-ocr.quant.onnx",
                                 sha256 = "73ee2e80cdce8f47590cb84486947f3bf0c1587bf46addb9007a7f7469ee332e",
+//                                "manga-ocr.preprocessed.static.onnx",
+//                                sha256 = "32c3dafff843ec110de0fe6ed8c1ffee848965bc6cd7439cbf0bd653f7eef4c0",
                             )
                         Log.v("ORT", "Prepared model file in ${System.currentTimeMillis() - start} ms")
                         buildSession(modelPath)
@@ -153,7 +155,7 @@ class OrtMangaOcr private constructor(
 
 //                addXnnpack(emptyMap())
 //                addNnapi()
-//                addCPU(true)
+                addCPU(true)
                 Log.v("ORT", "procs=${Runtime.getRuntime().availableProcessors()}")
                 setIntraOpNumThreads(Runtime.getRuntime().availableProcessors().coerceAtMost(4))
 
