@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, List
 
 import click
 import download
@@ -14,6 +14,16 @@ class Labeled:
     box: tuple[float, float, float, float]
     """Bounding box in xyxy format (left, top, right, bottom)"""
     text: str
+
+
+class Vocab:
+    def __init__(self, token_to_id: Dict[str, int], id_to_token: List[str]) -> None:
+        self.token_to_id = token_to_id
+        self.id_to_token = id_to_token
+
+    def tokenize(self, s: str) -> List[int]:
+        token_ids = [self.token_to_id[ch] for ch in s if ch in self.token_to_id]
+        return [2] + token_ids + [2]
 
 
 def _generate_labeled_for_file(file: Path):
@@ -112,20 +122,35 @@ def onnx_calibration_reader(manga109s_dir: Path):
     import numpy as np
     from onnxruntime.quantization.calibrate import CalibrationDataReader
 
+    vocab = load_vocab()
     labeleds = list(generate_labeleds(manga109s_dir))
-    labeleds = iter(random.sample(labeleds, 500))
-    token_ids = np.array([[2]])
+    sampled = iter(random.sample(labeleds, 500))
 
     class Manga109sCalibrationReader(CalibrationDataReader):
         def get_next(self) -> Dict[str, Any]:
-            labeled = next(labeleds, None)
+            labeled = next(sampled, None)
             if not labeled:
                 # The types on the superclass don't indicate it, but this
                 # is legit:
                 return None  # type: ignore
+
+            token_ids = np.array([vocab.tokenize(labeled.text)])
             return {"image": _preprocess_onnx(labeled), "token_ids": token_ids}
 
     return Manga109sCalibrationReader()
+
+
+def load_vocab() -> Vocab:
+    vocab_file = download.hf(
+        "kha-white/manga-ocr-base",
+        "vocab.txt",
+    )
+
+    with open(str(vocab_file), "r") as fp:
+        id_to_token = [line.rstrip() for line in fp.readlines()]
+
+    token_to_id = {token: i for i, token in enumerate(id_to_token)}
+    return Vocab(token_to_id, id_to_token)
 
 
 def download_manga109s():
