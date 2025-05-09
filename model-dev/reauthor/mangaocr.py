@@ -302,7 +302,7 @@ def _prepare_config(original_bin: Path, is_encoder: bool):
     return config, state_dict
 
 
-def reauthor(force: bool = False):
+def reauthor(force: bool = False, evaluate: bool = False):
     original_bin = download.hf(MANGA_OCR_BASE, "pytorch_model.bin")
     assert original_bin, "Failed to fetch manga-ocr-base model"
 
@@ -316,3 +316,20 @@ def reauthor(force: bool = False):
         _reauthor_decoder(original_bin, decoder_path)
     else:
         print("Already converted:", decoder_path)
+
+    if evaluate:
+        encoder = ai_edge_torch.load(str(encoder_path))
+        decoder = ai_edge_torch.load(str(decoder_path))
+
+        # vocab = dataset.load_vocab()
+
+        dataset_path = dataset.download_manga109s()
+        sample = dataset.onnx_calibration_reader(dataset_path, sample=False).get_next()
+        image_data = torch.tensor(sample["image"])
+        print("image_data=", image_data)
+
+        encoded = cast(torch.Tensor, encoder(image_data))
+        print("encoded=", encoded.shape)
+        print("pass to", decoder)
+        decoded = decoder(encoded, torch.tensor([[2]], dtype=torch.int))
+        print(decoded)

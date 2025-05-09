@@ -119,15 +119,19 @@ def _preprocess_onnx(labeled: Labeled):
     return image
 
 
-def onnx_calibration_reader(manga109s_dir: Path):
+def onnx_calibration_reader(manga109s_dir: Path, *, sample: bool = True):
     import random
 
     import numpy as np
     from onnxruntime.quantization.calibrate import CalibrationDataReader
 
     vocab = load_vocab()
-    labeleds = list(generate_labeleds(manga109s_dir))
-    sampled = iter(random.sample(labeleds, 500))
+    labeleds = generate_labeleds(manga109s_dir)
+    if sample:
+        labeleds = list()
+        sampled = iter(random.sample(labeleds, 500))
+    else:
+        sampled = labeleds
 
     class Manga109sCalibrationReader(CalibrationDataReader):
         def get_next(self) -> Dict[str, Any]:
