@@ -13,6 +13,10 @@ dependencies = [
     "torch (>=2.7.0,<3.0.0)",
     "transformers (>=4.51.3,<5.0.0)",
     "ultralytics (>=8.3.124,<9.0.0)",
+    "onnxscript (>=0.2.5,<0.3.0)",
+    "accelerate (>=1.6.0,<2.0.0)",
+    "fugashi (>=1.4.0,<2.0.0)",
+    "unidic-lite (>=1.0.8,<2.0.0)",
 ]
 
 

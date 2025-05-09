@@ -21,6 +21,9 @@ class Vocab:
         self.token_to_id = token_to_id
         self.id_to_token = id_to_token
 
+    def __len__(self) -> int:
+        return len(self.token_to_id)
+
     def tokenize(self, s: str) -> List[int]:
         token_ids = [self.token_to_id[ch] for ch in s if ch in self.token_to_id]
         return [2] + token_ids + [2]

@@ -13,6 +13,38 @@ files = [
 ]
 
 [[package]]
+name = "accelerate"
+version = "1.6.0"
+description = "Accelerate"
+optional = false
+python-versions = ">=3.9.0"
+groups = ["main"]
+files = [
+    {file = "accelerate-1.6.0-py3-none-any.whl", hash = "sha256:1aee717d3d3735ad6d09710a7c26990ee4652b79b4e93df46551551b5227c2aa"},
+    {file = "accelerate-1.6.0.tar.gz", hash = "sha256:28c1ef1846e690944f98b68dc7b8bb6c51d032d45e85dcbb3adb0c8b99dffb32"},
+]
+
+[package.dependencies]
+huggingface-hub = ">=0.21.0"
+numpy = ">=1.17,<3.0.0"
+packaging = ">=20.0"
+psutil = "*"
+pyyaml = "*"
+safetensors = ">=0.4.3"
+torch = ">=2.0.0"
+
+[package.extras]
+deepspeed = ["deepspeed"]
+dev = ["bitsandbytes", "black (>=23.1,<24.0)", "datasets", "diffusers", "evaluate", "hf-doc-builder (>=0.3.0)", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist", "rich", "ruff (>=0.11.2,<0.12.0)", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
+quality = ["black (>=23.1,<24.0)", "hf-doc-builder (>=0.3.0)", "ruff (>=0.11.2,<0.12.0)"]
+rich = ["rich"]
+sagemaker = ["sagemaker"]
+test-dev = ["bitsandbytes", "datasets", "diffusers", "evaluate", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
+test-prod = ["parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist"]
+test-trackers = ["comet-ml", "dvclive", "matplotlib", "mlflow", "tensorboard", "wandb"]
+testing = ["bitsandbytes", "datasets", "diffusers", "evaluate", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-order", "pytest-subtests", "pytest-xdist", "scikit-learn", "scipy", "timm", "torchdata (>=0.8.0)", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
+
+[[package]]
 name = "ai-edge-litert"
 version = "1.2.0"
 description = "LiteRT is for mobile and embedded devices."
@@ -522,6 +554,63 @@ test = ["aiohttp (!=4.0.0a0,!=4.0.0a1)", "numpy", "pytest", "pytest-asyncio (!=0
 test-downstream = ["aiobotocore (>=2.5.4,<3.0.0)", "dask[dataframe,test]", "moto[server] (>4,<5)", "pytest-timeout", "xarray"]
 test-full = ["adlfs", "aiohttp (!=4.0.0a0,!=4.0.0a1)", "cloudpickle", "dask", "distributed", "dropbox", "dropboxdrivefs", "fastparquet", "fusepy", "gcsfs", "jinja2", "kerchunk", "libarchive-c", "lz4", "notebook", "numpy", "ocifs", "pandas", "panel", "paramiko", "pyarrow", "pyarrow (>=1)", "pyftpdlib", "pygit2", "pytest", "pytest-asyncio (!=0.22.0)", "pytest-benchmark", "pytest-cov", "pytest-mock", "pytest-recording", "pytest-rerunfailures", "python-snappy", "requests", "smbprotocol", "tqdm", "urllib3", "zarr", "zstandard"]
 tqdm = ["tqdm"]
+
+[[package]]
+name = "fugashi"
+version = "1.4.0"
+description = "A Cython MeCab wrapper for fast, pythonic Japanese tokenization."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "fugashi-1.4.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0a2221232176244ff983b03d29a80b3be0768ef708405fb5f7629cf250386698"},
+    {file = "fugashi-1.4.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:70940296be946ea9dc3a0d6608f9f5cfb19d18693573634083e50aed5ae09edd"},
+    {file = "fugashi-1.4.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:d7aaa73e5c1614e9a4d50d8f3975727fcc01f318ff45fc000f2c4e4d96f2927a"},
+    {file = "fugashi-1.4.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:26679c754cdcb1683911b3de5c6c13d99eb47d962f98da0872fb0eb80cb278d1"},
+    {file = "fugashi-1.4.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fd19fa1b3d4965ef162801cd554b82b10dbe0344f094fb3375ff064c11c24478"},
+    {file = "fugashi-1.4.0-cp310-cp310-win_amd64.whl", hash = "sha256:c2eaafda887d1e7c41e1c332888e075459bf3ef74fdb474286671ac2033acaa5"},
+    {file = "fugashi-1.4.0-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:ec966fdf2647b87fea1ef31850ea3ec9960f0c409c8398c583d9b46673be9f7e"},
+    {file = "fugashi-1.4.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:96a1da8e74a36ce651a6452a94d339ef749b1882bc568679d0c9a03154569313"},
+    {file = "fugashi-1.4.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:86b8284d3ad49f970fd704327124a9b71a8500723222c35106c93c459acf7b26"},
+    {file = "fugashi-1.4.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a6a5ea534278c4dcaad44d7752585f8375029a28dd3a9d853deda34ddd2ae32d"},
+    {file = "fugashi-1.4.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b89b8e6db0fbe374c91322c1ec115061f154dd261aeb992a8b6d8e28056138a4"},
+    {file = "fugashi-1.4.0-cp311-cp311-win_amd64.whl", hash = "sha256:aeae8fc06d1c32c2ee1da79e30b8f25afd592853985e4776a3e4b78337e4b757"},
+    {file = "fugashi-1.4.0-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:eb88cb765c5d7c9bd5f01e179a98262970c3a4d3f14ee39daab641a6d89870c2"},
+    {file = "fugashi-1.4.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:08e965ee31782d8324e0aecb7b03c36db79a999f573f8fdc53960643c2637050"},
+    {file = "fugashi-1.4.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:44dd186fd5fbe295d2f5613f528ec8e765c93c31138adc65be0f391e0560da2b"},
+    {file = "fugashi-1.4.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:04ef5a3537bf2a3c5255b82f816e30f86ffc4711777357a0104a043753b84e82"},
+    {file = "fugashi-1.4.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c5e383c5fac4addb0203e022944df1a0c49859a64921af83ea9591da98211501"},
+    {file = "fugashi-1.4.0-cp312-cp312-win_amd64.whl", hash = "sha256:cb63079142cb9c9ca98c79ba487d58e169dde8750318c38d5fab8e00ac461e2f"},
+    {file = "fugashi-1.4.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:8b5e43ef6532c90ad3afac816fe5c63f8613c66119b28aeafdfa442abc4e5735"},
+    {file = "fugashi-1.4.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:322d357c446c1b2eba42f8170fc3c1094d78f08a13dbf060a08e58c7cdebcf42"},
+    {file = "fugashi-1.4.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:8fe382c159c2afb6dc3c653b169b9efe1699a7701ab23e5e019539058e5d06db"},
+    {file = "fugashi-1.4.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0cca9a9ecacb5269598764a56ab73b883001b93ab726032962d4d2d416b76c7b"},
+    {file = "fugashi-1.4.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:016d003de8db2b7b67a6ffaf74915cee8f717c3aa7a66b78acf30c5b13e0e9bc"},
+    {file = "fugashi-1.4.0-cp313-cp313-win_amd64.whl", hash = "sha256:99328a498150cfc39e4ac574a1431a24f967033420f4f92b4ade24aab0271ea2"},
+    {file = "fugashi-1.4.0-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:3f6dc71546bd995578dd58cade68b267392c0e5382f80ee30d3339ff370fa0a7"},
+    {file = "fugashi-1.4.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:63f1309e248ffa4ebdc4c927b6666075fcb41fce2674296edc6e700bedf72d41"},
+    {file = "fugashi-1.4.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:32d4c66bb3ce489a20ca87245e05626c8fedd8f9b72e901eff4518d2d21ba97c"},
+    {file = "fugashi-1.4.0-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f8fba18a4986dd9f9ac39c276c6b0372b9a2c0e981f7e1dd8a69199ce316d244"},
+    {file = "fugashi-1.4.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:884672b090c4f8d8582efc1c921bb0b69fb0f154db7ec3f57b345c8fdd0f9909"},
+    {file = "fugashi-1.4.0-cp38-cp38-win_amd64.whl", hash = "sha256:3615340db5b0f5b3f0fae1550bb753549dc7a87b8bfea67db769fda47c513748"},
+    {file = "fugashi-1.4.0-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:a9e0f66dd1fcda351e8e07565b826706b8dd535fa4a27a19a4cb138261239f24"},
+    {file = "fugashi-1.4.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:04db2cb4e157e7f9fe436336fbc0aaf0950acb93ff84fc0ed62752a7fb97acda"},
+    {file = "fugashi-1.4.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:99f1d0ec94326e5215610b156affb8e2dca2d96f2859f03ce380189223809101"},
+    {file = "fugashi-1.4.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b007f3adf5e185ef55093b65ade1b8201b3d2553bd363278360cfff2821b3154"},
+    {file = "fugashi-1.4.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:51598ec28fe49ad2971dc83b224d13b4d057d4fbe13754d55ad04a9286e9ff2c"},
+    {file = "fugashi-1.4.0-cp39-cp39-win_amd64.whl", hash = "sha256:de5b81a63654fcf583669d92f3b3b0c7c4ab41aa54441dce827c45232dbc98e7"},
+    {file = "fugashi-1.4.0-pp310-pypy310_pp73-macosx_10_15_x86_64.whl", hash = "sha256:4348142a8edfbbaefc6d4d11ee28de375bcb8e347a86908356ec4245d17fe259"},
+    {file = "fugashi-1.4.0-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:334793ca17a81c3fcea0ca2edf10bd5fcd9bc59cf8c99572003d76172d9e352d"},
+    {file = "fugashi-1.4.0-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:6c95a08ca732c68b85fc0e1d9596d9c930c062e107d5ecfc2e7a86d5a85ed907"},
+    {file = "fugashi-1.4.0-pp38-pypy38_pp73-macosx_11_0_arm64.whl", hash = "sha256:0c511691cf2d0b2d72ff69a72cdf51ce9ffc9c81ee193f95c4ca16ad9eae0b84"},
+    {file = "fugashi-1.4.0-pp39-pypy39_pp73-macosx_10_15_x86_64.whl", hash = "sha256:7f69c7cc1ca6ff896dc307702d80d80a1575d15237c34d9c8cfdc7cdb65b5481"},
+    {file = "fugashi-1.4.0-pp39-pypy39_pp73-macosx_11_0_arm64.whl", hash = "sha256:52ff5e6230344954316aa1a37688a9da46dcb94dac1960a52bd19dfbf6e2ae00"},
+    {file = "fugashi-1.4.0.tar.gz", hash = "sha256:443880fa975defc3194f524fbd6cdbcd32776fa66d573d07ccec9edb76cd5271"},
+]
+
+[package.extras]
+unidic = ["unidic"]
+unidic-lite = ["unidic-lite"]
 
 [[package]]
 name = "gast"
@@ -1632,6 +1721,25 @@ numpy = ">=1.21.6"
 packaging = "*"
 protobuf = "*"
 sympy = "*"
+
+[[package]]
+name = "onnxscript"
+version = "0.2.5"
+description = "Naturally author ONNX functions and models using a subset of Python"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "onnxscript-0.2.5-py3-none-any.whl", hash = "sha256:2d7f1fa7e8496339b87eeede15f37f0752fe97e80a6f033b9e07d36b3b554090"},
+    {file = "onnxscript-0.2.5.tar.gz", hash = "sha256:f44c727dfda04d42f39b7c0868b5825ee17c108cc164391d986e77fefa6724c5"},
+]
+
+[package.dependencies]
+ml_dtypes = "*"
+numpy = "*"
+onnx = ">=1.16"
+packaging = "*"
+typing_extensions = ">=4.10"
 
 [[package]]
 name = "opencv-python"
@@ -2995,6 +3103,17 @@ numpy = "*"
 torch = "*"
 
 [[package]]
+name = "unidic-lite"
+version = "1.0.8"
+description = "A small version of UniDic packaged for Python"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "unidic-lite-1.0.8.tar.gz", hash = "sha256:db9d4572d9fdd4d00a97949d4b0741ec480ee05a7e7e2e32f547500dae27b245"},
+]
+
+[[package]]
 name = "urllib3"
 version = "2.4.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -3137,4 +3256,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "fb9a54cd6206048c4e8e12824500a85a7e65ce3c445678e386b36071c4cc6b69"
+content-hash = "23785265b1dcbeb6bf03db66f0f4b7540443186dd1b1533b6809beb14992d76c"
