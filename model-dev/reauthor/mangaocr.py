@@ -116,36 +116,8 @@ class LoadedModelLoader(loading_utils.ModelLoader):
         return self._state_dict
 
 
-def _reauthor_encoder(original_bin: Path):
-    state_dict = torch.load(
-        str(original_bin),
-        map_location=torch.device("cpu") if not torch.cuda.is_available() else None,
-    )
-    print("state_dict=", state_dict.keys())
-
-    # TODO:
-    attn_config = cfg.AttentionConfig(
-        num_heads=12,
-        head_dim=64,
-        num_query_groups=12,
-    )
-    ff_config = cfg.FeedForwardConfig(
-        type=cfg.FeedForwardType.SEQUENTIAL,
-        activation=cfg.ActivationConfig(cfg.ActivationType.RELU),
-        intermediate_size=3072,
-    )
-    block_config = cfg.TransformerBlockConfig(
-        attn_config=attn_config, relative_attention=True, ff_config=ff_config
-    )
-
-    vocab = dataset.load_vocab()
-    config = cfg.ModelConfig(
-        vocab_size=len(vocab),
-        num_layers=8,  # NOTE: Originally 12
-        max_seq_len=300,
-        embedding_dim=768,
-        block_configs=block_config,
-    )
+def _reauthor_encoder(original_bin: Path, encoder_path: Path):
+    config, state_dict = _prepare_config(original_bin, is_encoder=True)
     encoder = MobileViTEncoder(config)
 
     print("Loading weights onto the encoder")
@@ -171,7 +143,6 @@ def _reauthor_encoder(original_bin: Path):
     edge_model = ai_edge_torch.convert(
         encoder.eval(), (image_tensor,), quant_config=quant_config
     )
-    encoder_path = OUTPUTS / "manga-ocr.encoder.tflite"
     edge_model.export(str(encoder_path))
     print(encoder_path, "@", encoder_path.stat().st_size)
 
@@ -190,8 +161,158 @@ def _reauthor_encoder(original_bin: Path):
     return encoder, edge_model
 
 
-def reauthor():
+class MobileBertDecoder(nn.Module):
+    def __init__(self, config: cfg.ModelConfig) -> None:
+        super().__init__()
+        self.config = config
+
+        hidden_size = config.embedding_dim
+        self.embedding = nn.Embedding(config.vocab_size, hidden_size)
+        self.decoder_layers = nn.ModuleList(
+            [
+                LightweightDecoderLayer(hidden_size, config.embedding_dim)
+                for _ in range(1)  # two layers
+            ]
+        )
+        self.norm = nn.LayerNorm(hidden_size)
+        self.output_projection = nn.Linear(hidden_size, config.vocab_size)
+
+    def forward(self, encoder_outputs, decoder_input_ids):
+        text_embeds = self.embedding(decoder_input_ids)
+        for layer in self.decoder_layers:
+            text_embeds = layer(text_embeds, encoder_outputs)
+
+        text_embeds = self.norm(text_embeds)
+
+        logits = self.output_projection(text_embeds)
+        return logits
+
+
+class LightweightDecoderLayer(nn.Module):
+    def __init__(self, hidden_size: int, intermediate_size: int) -> None:
+        super().__init__()
+
+        self.self_attention = nn.MultiheadAttention(
+            hidden_size, num_heads=1, batch_first=True
+        )
+        self.self_attention_norm = nn.LayerNorm(hidden_size)
+
+        self.cross_attention = nn.MultiheadAttention(
+            hidden_size, num_heads=1, batch_first=True
+        )
+        self.cross_attention_norm = nn.LayerNorm(hidden_size)
+
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden_size, intermediate_size),
+            nn.GELU(),
+            nn.Linear(intermediate_size, hidden_size),
+        )
+        self.ffn_norm = nn.LayerNorm(hidden_size)
+
+    def forward(self, hidden_states, encoder_hidden_states):
+        residual = hidden_states
+        hidden_states = self.self_attention_norm(hidden_states)
+
+        hidden_states, _ = self.self_attention(
+            hidden_states, hidden_states, hidden_states
+        )
+        hidden_states = residual + hidden_states
+
+        # cross-attention
+        residual = hidden_states
+        hidden_states = self.cross_attention_norm(hidden_states)
+        hidden_states, _ = self.cross_attention(
+            hidden_states, encoder_hidden_states, hidden_states
+        )
+        hidden_states = residual + hidden_states
+
+        # feed forward
+        residual = hidden_states
+        hidden_states = self.ffn_norm(hidden_states)
+        hidden_states = self.ffn(hidden_states)
+        hidden_states = residual + hidden_states
+
+        return hidden_states
+
+
+def _reauthor_decoder(original_bin: Path, decoder_path: Path):
+    config, state_dict = _prepare_config(original_bin, is_encoder=False)
+    decoder = MobileBertDecoder(config)
+
+    print("Loading weights onto the encoder")
+    tensor_names = loading_utils.ModelLoader.TensorNames(
+        ff_up_proj="decoder.bert.encoder.layer.{}.intermediate.dense",
+        ff_down_proj="decoder.bert.encoder.layer.{}.output.dense",
+        attn_query_proj="decoder.bert.encoder.layer.{}.attention.self.query",
+        attn_key_proj="decoder.bert.encoder.layer.{}.attention.self.key",
+        attn_value_proj="decoder.bert.encoder.layer.{}.attention.self.value",
+        attn_output_proj="decoder.bert.encoder.layer.{}.attention.output.dense",
+        pre_attn_norm="decoder.bert.encoder.layer.{}.attention.output.LayerNorm",
+        post_attn_norm="decoder.bert.encoder.layer.{}.output.LayerNorm",
+        embedding="decoder.bert.embeddings.word_embeddings",
+        final_norm="decoder.bert.embeddings.LayerNorm",
+    )
+    loader = LoadedModelLoader(original_bin, state_dict, names=tensor_names)
+    loader.load(decoder, strict=False)
+
+    encoded_tensor = torch.randn((1, 1, 768), dtype=torch.float32)
+    tokens_tensor = torch.tensor([[2]], dtype=torch.int)
+
+    quant_config = quant_recipes.full_int8_dynamic_recipe()
+    edge_model = ai_edge_torch.convert(
+        decoder.eval(), (encoded_tensor, tokens_tensor), quant_config=quant_config
+    )
+    edge_model.export(str(decoder_path))
+    print(decoder_path, "@", decoder_path.stat().st_size)
+
+    return decoder, edge_model
+
+
+def _prepare_config(original_bin: Path, is_encoder: bool):
+    state_dict = torch.load(
+        str(original_bin),
+        map_location=torch.device("cpu") if not torch.cuda.is_available() else None,
+    )
+    print("state_dict=", state_dict.keys())
+
+    attn_config = cfg.AttentionConfig(
+        num_heads=12,
+        head_dim=64,
+        num_query_groups=12,
+    )
+    ff_config = cfg.FeedForwardConfig(
+        type=cfg.FeedForwardType.SEQUENTIAL,
+        activation=cfg.ActivationConfig(cfg.ActivationType.RELU),
+        intermediate_size=3072,
+    )
+    block_config = cfg.TransformerBlockConfig(
+        attn_config=attn_config, relative_attention=True, ff_config=ff_config
+    )
+
+    encoder_layers = 8  # NOTE: Originally 12
+    decoder_layers = 2
+    vocab = dataset.load_vocab()
+    config = cfg.ModelConfig(
+        vocab_size=len(vocab),
+        num_layers=encoder_layers if is_encoder else decoder_layers,
+        max_seq_len=300,
+        embedding_dim=768,
+        block_configs=block_config,
+    )
+    return config, state_dict
+
+
+def reauthor(force: bool = False):
     original_bin = download.hf(MANGA_OCR_BASE, "pytorch_model.bin")
     assert original_bin, "Failed to fetch manga-ocr-base model"
 
-    _reauthor_encoder(original_bin)
+    encoder_path = OUTPUTS / "manga-ocr.encoder.tflite"
+    decoder_path = OUTPUTS / "manga-ocr.decoder.tflite"
+    if force or not encoder_path.exists():
+        _reauthor_encoder(original_bin, encoder_path)
+    else:
+        print("Already converted:", encoder_path)
+    if force or not decoder_path.exists():
+        _reauthor_decoder(original_bin, decoder_path)
+    else:
+        print("Already converted:", decoder_path)
