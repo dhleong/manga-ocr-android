@@ -21,6 +21,7 @@ interface MangaOcr {
         suspend fun initialize(context: Context): MangaOcr =
             LoggingMangaOcr(
                 OrtMangaOcr.initialize(context),
+//                TfliteMangaOcr.initialize(context),
             )
     }
 }
