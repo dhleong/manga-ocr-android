@@ -15,6 +15,7 @@ gps-tflite = "16.4.0"
 tflite = "0.4.0"
 
 coil = "3.1.0"
+litertApi = "1.2.0"
 
 [libraries]
 executorch = { group = "org.pytorch", name = "executorch-android", version.ref = "executorch" }
