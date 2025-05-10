@@ -15,6 +15,10 @@ open class BaseTensor<T>(
     val lastRowIndex: Int
         get() = rowsCount - 1
 
+    fun createShapeList() = shape.toList()
+
+    fun createLongShape() = LongArray(shape.size) { shape[it].toLong() }
+
     inline fun <T> mapRows(
         quitEarlyOnNull: Boolean = true,
         transform: (row: Int) -> T?,

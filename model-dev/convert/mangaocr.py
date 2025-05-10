@@ -45,7 +45,34 @@ def _convert_decoder(model: VisionEncoderDecoderModel | PreTrainedModel):
     quant_config = quant_recipes.full_int8_dynamic_recipe()
 
     encoder_hidden_states = torch.randn((1, 1, 768), dtype=torch.float32)
-    input_token_ids = torch.tensor([[2]], dtype=torch.float32)
+    input_token_ids = torch.randint(low=0, high=6144, size=(1, 300), dtype=torch.int32)
+    # input_token_ids = torch.tensor([[2]], dtype=torch.int32)
+
+    output = OUTPUTS / "manga-ocr.converted.decoder.onnx"
+    torch.onnx.export(
+        decoder,
+        f=str(output),
+        kwargs={
+            "encoder_hidden_states": encoder_hidden_states,
+            "input_ids": input_token_ids,
+        },
+        input_names=["input_ids", "encoder_hidden_states"],
+        output_names=["logits"],
+        dynamic_axes={
+            "input_ids": {
+                # 0: batch_size,
+                # 1: Dim.DYNAMIC,
+                1: "sequence_length",
+                # 0: "batch_size",
+                # 1: "sequence_length",
+            },
+        },
+    )
+    # onnx_model.optimize()
+    # onnx_decoder_model.save(output)
+    print("Converted!")
+    return
+
     edge_model = (
         ai_edge_torch.signature(
             "decode",
@@ -56,13 +83,14 @@ def _convert_decoder(model: VisionEncoderDecoderModel | PreTrainedModel):
             },
             dynamic_shapes={
                 "input_ids": {
-                    0: 1,
-                    1: Dim.DYNAMIC,
+                    # 0: batch_size,
+                    # 1: Dim.DYNAMIC,
+                    1: Dim("sequence_length", min=1, max=300),
                     # 0: "batch_size",
                     # 1: "sequence_length",
                 },
                 "encoder_hidden_states": {
-                    # 0: "batch_size"
+                    # 0: batch_size
                 },
             },
         )
@@ -83,7 +111,7 @@ def convert():
     # decode_input_tensor = torch.zeros((1, 768), dtype=torch.float32)
 
     print("Converting...")
-    _convert_encoder(model)
+    # _convert_encoder(model)
     _convert_decoder(model)
 
     # # Dummy input for the model
