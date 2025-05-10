@@ -3,7 +3,7 @@ package net.dhleong.mangaocr
 import android.content.Context
 import android.graphics.Bitmap
 import kotlinx.coroutines.flow.Flow
-import net.dhleong.mangaocr.ocr.TfliteMangaOcr
+import net.dhleong.mangaocr.ocr.SplitPhaseMangaOcr
 
 interface MangaOcr {
     sealed interface Result {
@@ -22,7 +22,7 @@ interface MangaOcr {
         suspend fun initialize(context: Context): MangaOcr =
             LoggingMangaOcr(
 //                OrtMangaOcr.initialize(context),
-                TfliteMangaOcr.initialize(context),
+                SplitPhaseMangaOcr.initialize(context),
             )
     }
 }

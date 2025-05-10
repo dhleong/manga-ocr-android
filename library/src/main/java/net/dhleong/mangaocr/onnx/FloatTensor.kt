@@ -42,6 +42,13 @@ class FloatTensor(
         return maxTokenId
     }
 
+    fun assertHasRows(): FloatTensor {
+        if (rowsCount == 0) {
+            throw IllegalStateException("No resultRows")
+        }
+        return this
+    }
+
     companion object {
         fun from(
             tensor: OnnxValue,
