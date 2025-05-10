@@ -4,17 +4,13 @@ from typing import Dict, cast
 import ai_edge_torch
 import ai_edge_torch.generative.layers.model_config as cfg
 import ai_edge_torch.generative.utilities.loader as loading_utils
-import ai_edge_torch.generative.utilities.verifier as verifier
 import download
 import torch
 from ai_edge_torch.generative.layers.attention import TransformerBlock
 from ai_edge_torch.generative.quantize import quant_recipes
-from ai_edge_torch.generative.utilities import transformers_verifier
 from const import OUTPUTS
 from torch import nn
 from train import dataset
-from transformers.models.auto.tokenization_auto import AutoTokenizer
-from transformers.models.vision_encoder_decoder import VisionEncoderDecoderModel
 
 MANGA_OCR_BASE = "kha-white/manga-ocr-base"
 

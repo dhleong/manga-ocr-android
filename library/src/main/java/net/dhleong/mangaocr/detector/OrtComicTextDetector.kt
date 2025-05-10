@@ -46,7 +46,7 @@ class OrtComicTextDetector private constructor(
             val blocks = FloatTensor.from(output)
 
             val boxes: List<MutableList<Bbox>> = listOf(mutableListOf(), mutableListOf())
-            for (i in blocks.indices) {
+            for (i in blocks.rowIndices) {
                 val confidence = blocks[0, i, 4]
                 if (confidence < CONFIDENCE_THRESHOLD) {
                     continue

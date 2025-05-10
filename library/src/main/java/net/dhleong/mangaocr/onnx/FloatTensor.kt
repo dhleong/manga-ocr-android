@@ -6,30 +6,11 @@ import org.tensorflow.lite.InterpreterApi
 import java.nio.FloatBuffer
 
 class FloatTensor(
-    val buffer: FloatBuffer,
-    private val shape: IntArray,
-    val rowsCount: Int,
-) {
-    val indices: IntRange
-        get() = IntRange(0, (rowsCount - 1).coerceAtLeast(0))
-
-    inline fun <T> mapRows(
-        quitEarlyOnNull: Boolean = true,
-        transform: (row: Int) -> T?,
-    ): List<T> {
-        val result = mutableListOf<T>()
-        for (row in 0 until rowsCount) {
-            val transformed = transform(row)
-            when {
-                transformed == null && quitEarlyOnNull ->
-                    return result
-                transformed != null ->
-                    result.add(transformed)
-            }
-        }
-        return result
-    }
-
+    buffer: FloatBuffer,
+    shape: IntArray,
+    rowsCount: Int,
+    name: String,
+) : BaseTensor<FloatBuffer>(buffer, shape, rowsCount, name) {
     operator fun get(
         x: Int,
         y: Int,
@@ -40,6 +21,25 @@ class FloatTensor(
                 y * shape[2] +
                 z
         return buffer.get(i)
+    }
+
+    fun maxValuedIndexInRow(row: Int): Int {
+        var maxTokenId = -1
+        var maxArg = 0f
+        for (i in colIndices) {
+            // find argmax
+            val value = this[0, row, i]
+            if (maxTokenId < 0 || value > maxArg) {
+                maxTokenId = i
+                maxArg = value
+            }
+        }
+
+        if (maxTokenId < 0) {
+            throw IllegalStateException("No max value found")
+        }
+
+        return maxTokenId
     }
 
     companion object {
@@ -54,6 +54,7 @@ class FloatTensor(
                     onnxTensor.info.shape[i].toInt()
                 },
                 rowsCount = onnxTensor.info.shape[rowsCountIndex].toInt(),
+                name = onnxTensor.info.dimensionNames.joinToString(","),
             )
         }
 
@@ -68,6 +69,7 @@ class FloatTensor(
                 buffer,
                 shape,
                 rowsCount = shape[rowsCountIndex],
+                name = tensor.name(),
             )
         }
     }

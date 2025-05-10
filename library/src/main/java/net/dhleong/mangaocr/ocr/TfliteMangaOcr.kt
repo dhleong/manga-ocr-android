@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import net.dhleong.mangaocr.MangaOcr
+import net.dhleong.mangaocr.Vocab
 import net.dhleong.mangaocr.hub.HfHubRepo
 import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
 import net.dhleong.mangaocr.tflite.await
@@ -19,12 +20,13 @@ import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
-import java.nio.LongBuffer
+import java.nio.IntBuffer
 import kotlin.system.measureTimeMillis
 
 class TfliteMangaOcr(
     private val encoder: InterpreterApi,
     private val decoder: InterpreterApi,
+    private val vocab: Vocab,
     private val maxChars: Int = 300,
     private val targetWidth: Int = 224,
     private val targetHeight: Int = 224,
@@ -35,7 +37,8 @@ class TfliteMangaOcr(
                 ImageProcessor
                     .Builder()
                     .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
-                    .add(NormalizeOp(127.5f, 127.5f)) // [ -1, 1 ]
+                    .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
+//                    .add(NormalizeOp(127.5f, 127.5f)) // [ -1, 1 ]
                     .build()
             val processed = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
@@ -44,24 +47,47 @@ class TfliteMangaOcr(
                 Log.v("TfliteDetector", "encoder($i): ${t.name()} / ${t.shape().toList()}")
             }
 
-            val encoded = encoder.allocateFloatOutputTensor(0)
-            Log.v("TfliteDetector", "encode(...): ${encoded.buffer.array().toList()}")
+            val encoded = encoder.allocateFloatOutputTensor(1)
+            Log.v("TfliteDetector", "encode(...): ${encoded.name}=${encoded.buffer.array().toList()}")
             val encodeTimeMs =
                 measureTimeMillis {
-                    encoder.run(processed.buffer, encoded.buffer)
+                    encoder.runForMultipleInputsOutputs(
+                        arrayOf(processed.buffer),
+                        mapOf(1 to encoded.buffer),
+                    )
                 }
             Log.v("TfliteDetector", "encode($encodeTimeMs ms): ${encoded.buffer.array().toList()}")
 
+            for (i in 0 until decoder.inputTensorCount) {
+                val t = decoder.getInputTensor(i)
+                Log.v("TfliteDetector", "decoder($i): ${t.name()} / ${t.shape().toList()}")
+            }
+
             // TODO: Loop with encoded into the decoder, accumulating tokens
-            val tokenIds = LongBuffer.allocate(maxChars)
+            val tokenIds = IntBuffer.allocate(1)
             tokenIds.put(2) // start token
 
-            // TODO: Get output buffer
             Log.v("TfliteMangaOcr", "output=${decoder.getOutputTensor(0).name()}")
-            decoder.runForMultipleInputsOutputs(arrayOf(encoded.buffer, tokenIds), emptyMap())
+            val logits = decoder.allocateFloatOutputTensor(0)
+            val decodeTimeMs =
+                measureTimeMillis {
+                    decoder.runForMultipleInputsOutputs(
+                        arrayOf(encoded.buffer, tokenIds),
+                        mapOf(0 to logits.buffer),
+                    )
+                }
+            Log.v("TfliteMangaOcr", "output($decodeTimeMs ms): ${logits.buffer.array().toList()}")
+
+            val maxTokenId = logits.maxValuedIndexInRow(logits.lastRowIndex)
+            val token = vocab.lookupToken(maxTokenId)
+            if (maxTokenId >= 5) {
+//                result.append(token)
+                emit(MangaOcr.Result.Partial(token))
+            }
+            Log.v("TfliteMangaOcr", "Got token $maxTokenId ($token)")
 
             // TODO:
-            emit(MangaOcr.Result.FinalResult(""))
+            emit(MangaOcr.Result.FinalResult(token))
         }.flowOn(Dispatchers.IO)
 
     companion object {
@@ -72,7 +98,7 @@ class TfliteMangaOcr(
 
         private val MODEL_ENCODER =
             ModelPath(
-                path = "manga-ocr.encoder.tflite",
+                path = "manga-ocr.converted.encoder.tflite",
                 sha256 = "",
             )
 
@@ -101,6 +127,7 @@ class TfliteMangaOcr(
                             sha256 = MODEL_DECODER.sha256,
                         )
                     }
+                val vocab = async { Vocab.fetch(context) }
                 val initialized =
                     async {
                         TfLite.initialize(context).await()
@@ -124,7 +151,7 @@ class TfliteMangaOcr(
                         },
                     )
 
-                TfliteMangaOcr(encoder, decoder)
+                TfliteMangaOcr(encoder, decoder, vocab.await())
             }
     }
 }
