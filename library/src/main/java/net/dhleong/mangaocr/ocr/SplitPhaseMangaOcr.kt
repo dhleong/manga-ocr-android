@@ -187,13 +187,13 @@ class SplitPhaseMangaOcr(
 
         private val ONNX_MODEL_ENCODER =
             ModelPath(
-                path = "manga-ocr.converted.encoder.onnx",
+                path = "manga-ocr.converted.encoder.preprocessed.quant.onnx",
                 sha256 = "",
             )
 
         private val ONNX_MODEL_DECODER =
             ModelPath(
-                path = "manga-ocr.converted.decoder.onnx",
+                path = "manga-ocr.converted.decoder.preprocessed.quant.onnx",
                 sha256 = "",
             )
 

@@ -1,13 +1,10 @@
-from io import BytesIO
 from typing import cast
 
 import ai_edge_torch
-import numpy as np
-import requests
 import torch
 from ai_edge_torch.generative.quantize import quant_recipes
 from const import OUTPUTS
-from PIL import Image
+from quant import ops
 from torch.export import Dim
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.vision_encoder_decoder import VisionEncoderDecoderModel
@@ -145,102 +142,10 @@ def _convert_decoder(
 def convert(tflite: bool = False):
     model = VisionEncoderDecoderModel.from_pretrained("kha-white/manga-ocr-base")
 
-    # This is nonsense to avoid lint complaints:
-    # TODO: Clean up PLEASE
-    if not model:
-        _old_convert()
-
     print("Converting...")
-    _convert_encoder(model, tflite=tflite)
-    _convert_decoder(model, tflite=tflite)
+    encoder_path = _convert_encoder(model, tflite=tflite)
+    decoder_path = _convert_decoder(model, tflite=tflite)
 
-    # def _preprocess(image: Image.Image) -> np.ndarray:
-    #     # convert to grayscale
-    #     image = image.convert("L").convert("RGB")
-    #     # resize
-    #     image = image.resize((224, 224), resample=2)
-    #     # rescale
-    #     image = np.array(image, dtype=np.float32)
-    #     image /= 255
-    #     # normalize
-    #     image = (image - 0.5) / 0.5
-    #     # reshape from (224, 224, 3) to (3, 224, 224)
-    #     image = image.transpose((2, 0, 1))
-    #     # add batch size
-    #     image = image[None]
-
-    #     return image
-
-    # url = "https://github.com/kha-white/manga-ocr/raw/master/assets/examples/02.jpg"
-    # response = requests.get(url)
-    # img = _preprocess(Image.open(BytesIO(response.content)))
-    # output = model(
-    #     pixel_values=torch.tensor(img), decoder_input_ids=torch.tensor([[2]])
-    # )
-    # print("hidden-states=", output.encoder_hidden_states)
-    # print("logits=", output.logits.shape, output.logits)
-    # print("token=", output.logits[0, -1, :].argmax())
-
-
-def _old_convert():
-    # Dummy input for the model
-    dummy_image = torch.randn(1, 3, 224, 224)
-    dummy_token_ids = torch.tensor([[2]])
-
-    # Export the model
-    model = VisionEncoderDecoderModel.from_pretrained("kha-white/manga-ocr-base")
-    onnx_model = torch.onnx.export(
-        model,
-        (dummy_image, dummy_token_ids),
-        input_names=["image", "token_ids"],
-        output_names=["logits"],
-        dynamic_axes={
-            "image": {
-                0: "batch_size",
-            },
-            "token_ids": {
-                0: "batch_size",
-                1: "sequence_length",
-            },
-            "logits": {
-                0: "batch_size",
-                1: "sequence_length",
-            },
-        },
-        dynamo=True,
-    )
-
-    output = OUTPUTS / "manga-ocr.dynamo.onnx"
-    onnx_model.optimize()
-    onnx_model.save(output)
-
-    print(output, output.stat().st_size)
-
-    # Export the model
-    dummy_image = torch.randn(1, 3, 224, 224)
-    dummy_token_ids = torch.tensor([[2]])
-    onnx_encoder_model = torch.onnx.export(
-        model,
-        (dummy_image, dummy_token_ids),
-        input_names=["image", "token_ids"],
-        output_names=["logits"],
-        dynamic_axes={
-            "image": {
-                0: "batch_size",
-            },
-            "token_ids": {
-                0: "batch_size",
-                1: "sequence_length",
-            },
-            "logits": {
-                0: "batch_size",
-                1: "sequence_length",
-            },
-        },
-    )
-
-    output = OUTPUTS / "manga-ocr.dynamo.onnx"
-    onnx_model.optimize()
-    onnx_model.save(output)
-
-    print(output, output.stat().st_size)
+    if not tflite:
+        ops.dynamic(ops.preprocess(encoder_path))
+        ops.dynamic(ops.preprocess(decoder_path))
