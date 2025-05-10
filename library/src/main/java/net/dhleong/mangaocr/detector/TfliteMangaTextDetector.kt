@@ -9,6 +9,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import net.dhleong.mangaocr.Detector
 import net.dhleong.mangaocr.hub.HfHubRepo
+import net.dhleong.mangaocr.hub.ModelPath
 import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
 import net.dhleong.mangaocr.tflite.await
 import org.tensorflow.lite.InterpreterApi
@@ -64,11 +65,6 @@ class TfliteMangaTextDetector(
     companion object {
         private const val CONFIDENCE_THRESHOLD = 0.05f
 
-        data class ModelPath(
-            val path: String,
-            val sha256: String,
-        )
-
         @Suppress("unused")
         val MODEL_FLOAT32 =
             ModelPath(
@@ -96,17 +92,11 @@ class TfliteMangaTextDetector(
             coroutineScope {
                 val modelFile =
                     async {
-                        HfHubRepo("dhleong/manga-ocr-android").resolveLocalPath(
-                            context,
-                            model.path,
-                            sha256 = model.sha256,
-                        )
+                        HfHubRepo("dhleong/manga-ocr-android")
+                            .resolveLocalPath(context, model)
                     }
 
-                val initialized =
-                    async {
-                        TfLite.initialize(context).await()
-                    }
+                val initialized = async { TfLite.initialize(context).await() }
 
                 initialized.await()
                 val interpreter =
