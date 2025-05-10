@@ -17,6 +17,7 @@ dependencies = [
     "accelerate (>=1.6.0,<2.0.0)",
     "fugashi (>=1.4.0,<2.0.0)",
     "unidic-lite (>=1.0.8,<2.0.0)",
+    "ipython (>=9.2.0,<10.0.0)",
 ]
 
 

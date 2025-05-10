@@ -34,18 +34,32 @@ class TfliteMangaOcr(
     override suspend fun process(bitmap: Bitmap): Flow<MangaOcr.Result> =
         flow {
             val encoded = encodeOnnx(bitmap)
-            val logits = decodeOnnx(encoded)
 
-            val maxTokenId = logits.maxValuedIndexInRow(logits.lastRowIndex)
-            val token = vocab.lookupToken(maxTokenId)
-            if (maxTokenId >= 5) {
-//                result.append(token)
-                emit(MangaOcr.Result.Partial(token))
+            val tokenIds = LongBuffer.allocate(maxChars)
+            tokenIds.put(2) // start token
+            val result = StringBuilder()
+
+            for (tokensCount in 1 until maxChars) {
+                // Prepare to read the tokenIds:
+                tokenIds.flip()
+                val logits = decodeOnnx(encoded, tokenIds, tokensCount)
+
+                val maxTokenId = logits.maxValuedIndexInRow(logits.lastRowIndex)
+                val token = vocab.lookupToken(maxTokenId)
+                if (maxTokenId >= 5) {
+                    result.append(token)
+                    emit(MangaOcr.Result.Partial(result))
+                } else if (maxTokenId == 3) {
+                    break
+                }
+
+                tokenIds.limit(tokensCount + 1)
+                tokenIds.position(tokensCount)
+                tokenIds.put(maxTokenId.toLong())
+                Log.v("TfliteMangaOcr", "Got token $maxTokenId ($token)")
             }
-            Log.v("TfliteMangaOcr", "Got token $maxTokenId ($token)")
 
-            // TODO:
-            emit(MangaOcr.Result.FinalResult(token))
+            emit(MangaOcr.Result.FinalResult(result.toString()))
         }.flowOn(Dispatchers.IO)
 
 //    private fun encode(bitmap: Bitmap): FloatTensor {
@@ -100,12 +114,11 @@ class TfliteMangaOcr(
         return encoded
     }
 
-    private fun decodeOnnx(encoded: FloatTensor): FloatTensor {
-        val tokenIds = LongBuffer.allocate(maxChars)
-        tokenIds.put(2) // start token
-        tokenIds.flip()
-        val tokensCount = 1
-
+    private fun decodeOnnx(
+        encoded: FloatTensor,
+        tokenIds: LongBuffer,
+        tokensCount: Int,
+    ): FloatTensor {
         encoded.buffer.limit(encoded.buffer.capacity()) // FIXME ?
 //        encoded.buffer.limit(768) // FIXME
         encoded.buffer.position(0)
