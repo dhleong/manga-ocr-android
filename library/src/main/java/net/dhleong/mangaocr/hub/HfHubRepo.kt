@@ -15,6 +15,16 @@ class HfHubRepo(
 ) {
     suspend fun resolveLocalPath(
         context: Context,
+        repoPath: ModelPath,
+    ): File =
+        resolveLocalPath(
+            context = context,
+            repoPath = repoPath.path,
+            sha256 = repoPath.sha256,
+        )
+
+    suspend fun resolveLocalPath(
+        context: Context,
         repoPath: String,
         revision: String = "main",
         sha256: String? = null,

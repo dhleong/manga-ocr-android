@@ -1,10 +1,12 @@
 from pathlib import Path
 
 from onnxruntime.quantization import (
+    CalibrationDataReader,
     QuantType,
     matmul_4bits_quantizer,
     quant_utils,
     quantize_dynamic,
+    quantize_static,
 )
 from onnxruntime.quantization.preprocess import quant_pre_process
 
@@ -21,8 +23,9 @@ def _output_path(input: Path, variant: str) -> Path:
 
 def preprocess(input: Path):
     output = _output_path(input, "preprocessed")
-    print(f"Prepreocess {input} -> {output}")
-    quant_pre_process(input, output)
+    if not output.exists():
+        print(f"Preprocess {input} -> {output}")
+        quant_pre_process(input, output, auto_merge=True)
     return output
 
 
@@ -65,6 +68,16 @@ def dynamic(input: Path) -> Path:
             "EmbedLayerNormalization",
         ],
     )
+    print(output.name, ":", output.stat().st_size)
+    return output
+
+
+def static(input: Path, calibration: CalibrationDataReader) -> Path:
+    print("Static-quantize:", input)
+    # Assuming we'll run on CPU...
+    q_static_opts = {"ActivationSymmetric": False, "WeightSymmetric": True}
+    output = _output_path(input, "static")
+    quantize_static(input, output, calibration, extra_options=q_static_opts)
     print(output.name, ":", output.stat().st_size)
     return output
 

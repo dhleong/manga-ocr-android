@@ -37,3 +37,10 @@ def ogkalu_yolo():
 
     for mode, output_path in outputs:
         print(f"Output {mode} tflite_model to: ", output_path)
+
+
+@convert.command()
+def manga_ocr():
+    from convert.mangaocr import convert
+
+    convert()
