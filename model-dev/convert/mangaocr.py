@@ -4,6 +4,7 @@ import ai_edge_torch
 import torch
 from ai_edge_torch.generative.quantize import quant_recipes
 from const import OUTPUTS
+from torch.export import Dim
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.vision_encoder_decoder import VisionEncoderDecoderModel
 
@@ -52,6 +53,17 @@ def _convert_decoder(model: VisionEncoderDecoderModel | PreTrainedModel):
             sample_kwargs={
                 "input_ids": input_token_ids,
                 "encoder_hidden_states": encoder_hidden_states,
+            },
+            dynamic_shapes={
+                "input_ids": {
+                    0: 1,
+                    1: Dim.DYNAMIC,
+                    # 0: "batch_size",
+                    # 1: "sequence_length",
+                },
+                "encoder_hidden_states": {
+                    # 0: "batch_size"
+                },
             },
         )
         # .signature("decode", decoder, decoder.dummy_inputs.values())
