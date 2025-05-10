@@ -185,16 +185,19 @@ class SplitPhaseMangaOcr(
                 sha256 = "",
             )
 
+        // NOTE: "converted" is not *really* a proper prefix for these files since it's a
+        // pretty straightforward dump to onnx from pytorch but... we'll keep it for historical
+        // reasons, I guess (we originally wanted to convert to tflite; see above).
         private val ONNX_MODEL_ENCODER =
             ModelPath(
                 path = "manga-ocr.converted.encoder.preprocessed.quant.onnx",
-                sha256 = "",
+                sha256 = "5766730bc8e894d8f61f8671f59eabe59afe9d614c05d1fcd52b306f15458459",
             )
 
         private val ONNX_MODEL_DECODER =
             ModelPath(
                 path = "manga-ocr.converted.decoder.preprocessed.quant.onnx",
-                sha256 = "",
+                sha256 = "a9ba33fdf9020b25e227a7b97abab8a5be16872745888eb49b017507efd4b2b5",
             )
 
         suspend fun initialize(
