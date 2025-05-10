@@ -200,6 +200,10 @@ class SplitPhaseMangaOcr(
                 sha256 = "a9ba33fdf9020b25e227a7b97abab8a5be16872745888eb49b017507efd4b2b5",
             )
 
+        /**
+         * Do not use the tflite models. They don't work (and aren't uploaded besides)
+         * and are simply kept around in case we want to experiment later
+         */
         suspend fun initialize(
             context: Context,
             useTfliteEncoder: Boolean = false,
