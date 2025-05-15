@@ -11,9 +11,15 @@ class DetectorManager(
     context: Context,
     scope: LifecycleCoroutineScope,
     lifecycle: Lifecycle,
+    private val forceLegacy: Boolean = false,
 ) : BaseManager<Detector>(context, scope, lifecycle),
     Detector {
-    override suspend fun initialize(context: Context): Detector = Detector.initialize(context)
+    override suspend fun initialize(context: Context): Detector =
+        if (forceLegacy) {
+            Detector.initializeLegacy(context)
+        } else {
+            Detector.initialize(context)
+        }
 
     override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
         val model = awaitModel()

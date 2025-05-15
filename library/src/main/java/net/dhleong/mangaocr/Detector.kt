@@ -18,6 +18,8 @@ interface Detector {
     )
 
     companion object {
+        suspend fun initializeLegacy(context: Context): Detector = LoggingDetector(OrtComicTextDetector.initialize(context))
+
         suspend fun initialize(
             context: Context,
             fallback: Boolean = true,

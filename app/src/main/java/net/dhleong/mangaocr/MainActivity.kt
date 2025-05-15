@@ -11,22 +11,28 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import androidx.core.graphics.applyCanvas
 import androidx.lifecycle.lifecycleScope
@@ -36,7 +42,6 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
@@ -49,8 +54,11 @@ class MainActivity : ComponentActivity() {
     private val manager: MangaOcrManager by lazy {
         MangaOcrManager(this, lifecycleScope, lifecycle)
     }
-    private val detector: Detector by lazy {
+    private val newDetector: Detector by lazy {
         DetectorManager(this, lifecycleScope, lifecycle)
+    }
+    private val oldDetector: Detector by lazy {
+        DetectorManager(this, lifecycleScope, lifecycle, forceLegacy = true)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,19 +69,17 @@ class MainActivity : ComponentActivity() {
             var lastBitmap: Bitmap? by remember { mutableStateOf(null) }
             var loading by remember { mutableStateOf(false) }
             var output by remember { mutableStateOf("") }
+            var useLegacyDetector by remember { mutableStateOf(false) }
 
             val onLoading: (Boolean) -> Unit = { loading = it }
             val onBitmap: (Bitmap) -> Unit = { lastBitmap = it }
             val onResult: (CharSequence) -> Unit = { output = it.toString() }
 
+            val detector = if (useLegacyDetector) oldDetector else newDetector
+
             MangaOCRTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column {
-                        Greeting(
-                            name = "Android",
-                            modifier = Modifier.padding(innerPadding),
-                        )
-
+                    Column(modifier = Modifier.padding(innerPadding)) {
                         if (USE_REAL_IMAGE) {
                             Row {
                                 for (i in 0..5) {
@@ -89,13 +95,21 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Row {
-                            Button(onClick = { processDetection(onLoading, onBitmap, onResult) }) {
+                            Button(onClick = { processDetection(detector, onLoading, onBitmap, onResult) }) {
                                 Text("Detect")
                             }
 
-                            Button(onClick = { detectClipboard(onLoading, onBitmap, onResult) }) {
+                            Button(onClick = { detectClipboard(detector, onLoading, onBitmap, onResult) }) {
                                 Text("Detect Clipboard")
                             }
+                        }
+
+                        Row {
+                            LabeledSwitch(
+                                label = "Legacy Detector",
+                                checked = useLegacyDetector,
+                                onCheckedChange = { useLegacyDetector = it },
+                            )
                         }
 
                         lastBitmap?.let {
@@ -164,6 +178,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun detectClipboard(
+        detector: Detector,
         setLoading: (Boolean) -> Unit,
         setBitmap: (Bitmap) -> Unit,
         setResult: (CharSequence) -> Unit,
@@ -174,13 +189,14 @@ class MainActivity : ComponentActivity() {
             val item = clip.getItemAt(i).uri ?: continue
             contentResolver.openInputStream(item).use { input ->
                 val bitmap = BitmapFactory.decodeStream(input)
-                processDetection(setLoading, setBitmap, setResult, bitmap)
+                processDetection(detector, setLoading, setBitmap, setResult, bitmap)
                 return
             }
         }
     }
 
     private fun processDetection(
+        detector: Detector,
         setLoading: (Boolean) -> Unit,
         setBitmap: (Bitmap) -> Unit,
         setResult: (CharSequence) -> Unit,
@@ -241,21 +257,36 @@ private fun Bitmap.mutate(): Bitmap {
     return copy(Bitmap.Config.ARGB_8888, true)
 }
 
+@Suppress("ktlint:standard:function-naming", "SameParameterValue")
 @Composable
-fun Greeting(
-    name: String,
-    modifier: Modifier = Modifier,
+private fun LabeledSwitch(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
 ) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier,
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MangaOCRTheme {
-        Greeting("Android")
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(
+        modifier =
+            Modifier
+                .selectable(
+                    checked,
+                    interactionSource = interactionSource,
+                    // This is for removing ripple when Row is clicked
+                    indication = null,
+                    role = Role.Switch,
+                    onClick = {
+                        onCheckedChange(!checked)
+                    },
+                ).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label)
+        Spacer(modifier = Modifier.padding(start = 8.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                onCheckedChange(it)
+            },
+        )
     }
 }

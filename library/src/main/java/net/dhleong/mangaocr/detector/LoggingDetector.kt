@@ -14,4 +14,6 @@ class LoggingDetector(
         Log.v("Detector", "Detected (${result.size}) in $total ms: $result")
         return result
     }
+
+    override fun toString(): String = "LoggingDetector($delegate)"
 }
