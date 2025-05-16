@@ -85,9 +85,15 @@ class TfliteMangaTextDetector(
                 sha256 = "2c8a423844cfb4707f26a1e0d493a8919315a2dfea079c2f1fdb5cf8e55a1f60",
             )
 
+        private val MODEL_INT8_WITH_DATA =
+            ModelPath(
+                path = "manga-text-detector_int8.with_data.tflite",
+                sha256 = "",
+            )
+
         suspend fun initialize(
             context: Context,
-            model: ModelPath = MODEL_INT8,
+            model: ModelPath = MODEL_INT8_WITH_DATA,
         ): Detector =
             coroutineScope {
                 val modelFile =

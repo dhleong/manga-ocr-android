@@ -1,4 +1,6 @@
 from pathlib import Path
 
-INPUTS = Path("./model-dev/inputs")
-OUTPUTS = Path("./model-dev/outputs")
+__DEV_ROOT__ = Path(__file__).parent.absolute()
+
+INPUTS = __DEV_ROOT__ / "inputs"
+OUTPUTS = __DEV_ROOT__ / "outputs"
