@@ -11,7 +11,20 @@ def convert(): ...
 
 
 @convert.command()
-def ogkalu_yolo():
+@click.option("--recreate", is_flag=True, default=False)
+def build_yolo_dataset(recreate: bool):
+    from train import dataset
+
+    path = dataset.build_yolo_dataset(recreate=recreate)
+    print(path)
+
+
+@convert.command()
+@click.option("--with-data", is_flag=True, default=False)
+def ogkalu_yolo(with_data: bool):
+    from train import dataset
+
+    dataset = dataset.build_yolo_dataset() if with_data else None
     yolov8 = download.hf("ogkalu/manga-text-detector-yolov8s", "manga-text-detector.pt")
 
     import ultralytics
@@ -23,15 +36,20 @@ def ogkalu_yolo():
     # ops.dynamic(processed)
 
     export_modes = [
-        dict(),
-        dict(half=True),
+        # dict(),
+        # dict(half=True),
         dict(int8=True),
     ]
 
     outputs = []
     for mode in export_modes:
-        exported_path = model.export(format="tflite", nms=True, **mode)
+        exported_path = model.export(
+            format="tflite", nms=True, data=str(dataset), **mode
+        )
         output_path = OUTPUTS / Path(exported_path).name
+        if with_data:
+            output_path = output_path.with_suffix(".with_data.tflite")
+
         shutil.move(exported_path, output_path)
         outputs.append((mode, output_path))
 

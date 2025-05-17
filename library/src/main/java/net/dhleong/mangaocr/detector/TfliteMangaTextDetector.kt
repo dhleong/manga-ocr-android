@@ -5,12 +5,15 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.util.Log
 import com.google.android.gms.tflite.java.TfLite
+import com.google.common.primitives.Floats.min
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import net.dhleong.mangaocr.Detector
 import net.dhleong.mangaocr.hub.HfHubRepo
 import net.dhleong.mangaocr.hub.ModelPath
+import net.dhleong.mangaocr.onnx.FloatTensor
 import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
+import net.dhleong.mangaocr.tflite.ResizeWithPadOp
 import net.dhleong.mangaocr.tflite.await
 import org.tensorflow.lite.InterpreterApi
 import org.tensorflow.lite.support.common.ops.NormalizeOp
@@ -22,48 +25,125 @@ class TfliteMangaTextDetector(
     private val interpreter: InterpreterApi,
     private val targetWidth: Int = 640,
     private val targetHeight: Int = 640,
+    private val processor: Processor = LetterboxProcessor(targetWidth, targetHeight),
+    private val primaryClassOnly: Boolean = false,
 ) : Detector {
-    override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
-        val imageProcessor =
+    interface Processor {
+        enum class Type {
+            OLD,
+            LETTERBOX,
+            LETTERBOX_SELECTIVE,
+        }
+
+        fun preprocess(bitmap: Bitmap): TensorImage
+
+        fun extractRect(
+            output: FloatTensor,
+            bitmap: Bitmap,
+            index: Int,
+        ): RectF
+    }
+
+    class OldProcessor(
+        targetWidth: Int,
+        targetHeight: Int,
+    ) : Processor {
+        private val imageProcessor =
             ImageProcessor
                 .Builder()
                 .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
                 .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
                 .build()
-        val processed = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
-        // The YOLO model seems to output in xyxyn format,
-        // IE: normalized within the *original* width
-        val ratioX = bitmap.width
-        val ratioY = bitmap.height
+        override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
+        override fun extractRect(
+            output: FloatTensor,
+            bitmap: Bitmap,
+            index: Int,
+        ): RectF {
+            // The YOLO model seems to output in xyxyn format,
+            // IE: normalized within the *original* width
+            val left = output[0, index, 0] * bitmap.width
+            val top = output[0, index, 1] * bitmap.height
+            val right = output[0, index, 2] * bitmap.width
+            val bottom = output[0, index, 3] * bitmap.height
+            return RectF(left, top, right, bottom)
+        }
+    }
+
+    class LetterboxProcessor(
+        private val targetWidth: Int,
+        private val targetHeight: Int,
+    ) : Processor {
+        private val resize = ResizeWithPadOp(targetHeight, targetWidth)
+        private val imageProcessor =
+            ImageProcessor
+                .Builder()
+                .add(resize)
+                .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
+                .build()
+
+        override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
+
+        override fun extractRect(
+            output: FloatTensor,
+            bitmap: Bitmap,
+            index: Int,
+        ): RectF {
+            val gain =
+                min(
+                    targetHeight / bitmap.height.toFloat(),
+                    targetWidth / bitmap.width.toFloat(),
+                )
+            val padX =
+                (targetWidth - bitmap.width * gain) / 2 - 0.1f
+            val padY =
+                (targetHeight - bitmap.height * gain) / 2 - 0.1f
+
+            val xn = output[0, index, 0] * targetWidth
+            val yn = output[0, index, 1] * targetHeight
+            val xm = output[0, index, 2] * targetWidth
+            val ym = output[0, index, 3] * targetHeight
+            val left = (xn - padX) / gain
+            val top = (yn - padY) / gain
+            val right = (xm - padX) / gain
+            val bottom = (ym - padY) / gain
+
+            return RectF(left, top, right, bottom)
+        }
+    }
+
+    override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
+        val processed = processor.preprocess(bitmap)
         val outputTensor = interpreter.getOutputTensor(0)
         Log.v("TfliteDetector", "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
 
         val output = interpreter.allocateFloatOutputTensor(0)
         interpreter.run(processed.buffer, output.buffer)
-        Log.v("TfliteDetector", "output: ${output.buffer.array().toList()}")
 
-        return output.mapRows { i ->
-            val confidence = output[0, i, 4]
-            if (confidence < CONFIDENCE_THRESHOLD) {
-                return@mapRows null
+        val rows =
+            output.mapRows { i ->
+                val confidence = output[0, i, 4]
+                if (confidence < CONFIDENCE_THRESHOLD) {
+                    return@mapRows null
+                }
+
+                val rect = processor.extractRect(output, bitmap, i)
+                Detector.Result(
+                    bbox = Bbox(rect, confidence),
+                    classIndex = output[0, i, 5].toInt(),
+                )
             }
-
-            val left = output[0, i, 0] * ratioX
-            val top = output[0, i, 1] * ratioY
-            val right = output[0, i, 2] * ratioX
-            val bottom = output[0, i, 3] * ratioY
-
-            Detector.Result(
-                bbox = Bbox(RectF(left, top, right, bottom), confidence),
-                classIndex = output[0, i, 5].toInt(),
-            )
+        return if (primaryClassOnly) {
+            rows.filter { it.classIndex == 1 }
+        } else {
+            rows
         }
     }
 
     companion object {
-        private const val CONFIDENCE_THRESHOLD = 0.05f
+        private const val CONFIDENCE_THRESHOLD = 0.25f
 
         @Suppress("unused")
         val MODEL_FLOAT32 =
@@ -85,9 +165,16 @@ class TfliteMangaTextDetector(
                 sha256 = "2c8a423844cfb4707f26a1e0d493a8919315a2dfea079c2f1fdb5cf8e55a1f60",
             )
 
+        private val MODEL_INT8_WITH_DATA =
+            ModelPath(
+                path = "manga-text-detector_int8.with_data.tflite",
+                sha256 = "2bc1213c7dc666d326f1b6c5a74adc62a1e946cec8b607d146164c7e85dcaf71",
+            )
+
         suspend fun initialize(
             context: Context,
-            model: ModelPath = MODEL_INT8,
+            model: ModelPath = MODEL_INT8_WITH_DATA,
+            processorType: Processor.Type = Processor.Type.LETTERBOX_SELECTIVE,
         ): Detector =
             coroutineScope {
                 val modelFile =
@@ -107,7 +194,20 @@ class TfliteMangaTextDetector(
                         },
                     )
 
-                TfliteMangaTextDetector(interpreter)
+                val targetWidth = 640
+                val targetHeight = 640
+                val processor =
+                    when (processorType) {
+                        Processor.Type.OLD -> OldProcessor(targetWidth, targetHeight)
+                        Processor.Type.LETTERBOX, Processor.Type.LETTERBOX_SELECTIVE ->
+                            LetterboxProcessor(targetWidth, targetHeight)
+                    }
+                TfliteMangaTextDetector(
+                    interpreter,
+                    processor = processor,
+                    primaryClassOnly =
+                        processorType == Processor.Type.LETTERBOX_SELECTIVE,
+                )
             }
     }
 }
