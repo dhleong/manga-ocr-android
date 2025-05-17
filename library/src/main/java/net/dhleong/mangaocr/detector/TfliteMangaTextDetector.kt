@@ -26,11 +26,13 @@ class TfliteMangaTextDetector(
     private val targetWidth: Int = 640,
     private val targetHeight: Int = 640,
     private val processor: Processor = LetterboxProcessor(targetWidth, targetHeight),
+    private val primaryClassOnly: Boolean = false,
 ) : Detector {
     interface Processor {
         enum class Type {
             OLD,
             LETTERBOX,
+            LETTERBOX_SELECTIVE,
         }
 
         fun preprocess(bitmap: Bitmap): TensorImage
@@ -107,12 +109,6 @@ class TfliteMangaTextDetector(
             val top = (yn - padY) / gain
             val right = (xm - padX) / gain
             val bottom = (ym - padY) / gain
-            Log.v(
-                "TfliteDetector",
-                "gain: $gain pad: $padX, $padY (${bitmap.width} x ${bitmap.height})" +
-                    " -> ${output[0, index, 0]} $xn $yn $xm $ym" +
-                    " => $left $top $right $bottom",
-            )
 
             return RectF(left, top, right, bottom)
         }
@@ -126,17 +122,23 @@ class TfliteMangaTextDetector(
         val output = interpreter.allocateFloatOutputTensor(0)
         interpreter.run(processed.buffer, output.buffer)
 
-        return output.mapRows { i ->
-            val confidence = output[0, i, 4]
-            if (confidence < CONFIDENCE_THRESHOLD) {
-                return@mapRows null
-            }
+        val rows =
+            output.mapRows { i ->
+                val confidence = output[0, i, 4]
+                if (confidence < CONFIDENCE_THRESHOLD) {
+                    return@mapRows null
+                }
 
-            val rect = processor.extractRect(output, bitmap, i)
-            Detector.Result(
-                bbox = Bbox(rect, confidence),
-                classIndex = output[0, i, 5].toInt(),
-            )
+                val rect = processor.extractRect(output, bitmap, i)
+                Detector.Result(
+                    bbox = Bbox(rect, confidence),
+                    classIndex = output[0, i, 5].toInt(),
+                )
+            }
+        return if (primaryClassOnly) {
+            rows.filter { it.classIndex == 1 }
+        } else {
+            rows
         }
     }
 
@@ -172,7 +174,7 @@ class TfliteMangaTextDetector(
         suspend fun initialize(
             context: Context,
             model: ModelPath = MODEL_INT8_WITH_DATA,
-            processorType: Processor.Type = Processor.Type.LETTERBOX,
+            processorType: Processor.Type = Processor.Type.LETTERBOX_SELECTIVE,
         ): Detector =
             coroutineScope {
                 val modelFile =
@@ -197,9 +199,15 @@ class TfliteMangaTextDetector(
                 val processor =
                     when (processorType) {
                         Processor.Type.OLD -> OldProcessor(targetWidth, targetHeight)
-                        Processor.Type.LETTERBOX -> LetterboxProcessor(targetWidth, targetHeight)
+                        Processor.Type.LETTERBOX, Processor.Type.LETTERBOX_SELECTIVE ->
+                            LetterboxProcessor(targetWidth, targetHeight)
                     }
-                TfliteMangaTextDetector(interpreter, processor = processor)
+                TfliteMangaTextDetector(
+                    interpreter,
+                    processor = processor,
+                    primaryClassOnly =
+                        processorType == Processor.Type.LETTERBOX_SELECTIVE,
+                )
             }
     }
 }
