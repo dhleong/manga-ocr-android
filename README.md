@@ -12,7 +12,7 @@ The library module is published via jitpack:
 
 ```
 dependencies {
-    implementation 'com.github.dhleong:manga-ocr-android:276d6e06f4'
+    implementation 'com.github.dhleong:manga-ocr-android:a4f2a6c8f0'
 }
 ```
 
