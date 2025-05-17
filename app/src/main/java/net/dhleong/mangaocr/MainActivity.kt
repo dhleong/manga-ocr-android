@@ -48,7 +48,6 @@ import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
 import okio.FileNotFoundException
-import okio.IOException
 import okio.buffer
 import okio.sink
 import okio.source
@@ -199,7 +198,7 @@ class MainActivity : ComponentActivity() {
         val lastClipboardFile = File(cacheDir, "last-clipboard.jpg")
         try {
             if (item == null) {
-                throw IOException("No clip")
+                throw FileNotFoundException("No clip")
             }
             contentResolver.openInputStream(item).use { input ->
                 lastClipboardFile
