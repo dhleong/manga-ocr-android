@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -46,7 +47,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
+import okio.FileNotFoundException
+import okio.IOException
+import okio.buffer
+import okio.sink
+import okio.source
 import okio.use
+import java.io.File
 
 private const val USE_REAL_IMAGE = true
 
@@ -184,14 +191,35 @@ class MainActivity : ComponentActivity() {
         setResult: (CharSequence) -> Unit,
     ) {
         val service = requireNotNull(getSystemService<ClipboardManager>())
-        val clip = service.primaryClip ?: return
-        for (i in 0 until clip.itemCount) {
-            val item = clip.getItemAt(i).uri ?: continue
+        val clip = service.primaryClip
+        val item =
+            (0 until (clip?.itemCount ?: 0))
+                .firstNotNullOfOrNull { clip!!.getItemAt(it).uri }
+
+        val lastClipboardFile = File(cacheDir, "last-clipboard.jpg")
+        try {
+            if (item == null) {
+                throw IOException("No clip")
+            }
             contentResolver.openInputStream(item).use { input ->
+                lastClipboardFile
+                    .sink()
+                    .buffer()
+                    .use { sink ->
+                        sink.writeAll(input!!.source().buffer())
+                    }
+            }
+        } catch (e: FileNotFoundException) {
+            Log.v("Detect", "Failed to load clip; trying last fetched", e)
+        }
+
+        try {
+            lastClipboardFile.inputStream().buffered().use { input ->
                 val bitmap = BitmapFactory.decodeStream(input)
                 processDetection(detector, setLoading, setBitmap, setResult, bitmap)
-                return
             }
+        } catch (e: FileNotFoundException) {
+            Toast.makeText(this, "No clip", Toast.LENGTH_SHORT).show()
         }
     }
 
