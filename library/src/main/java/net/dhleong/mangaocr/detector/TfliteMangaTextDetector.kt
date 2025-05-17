@@ -168,7 +168,7 @@ class TfliteMangaTextDetector(
         private val MODEL_INT8_WITH_DATA =
             ModelPath(
                 path = "manga-text-detector_int8.with_data.tflite",
-                sha256 = "",
+                sha256 = "2bc1213c7dc666d326f1b6c5a74adc62a1e946cec8b607d146164c7e85dcaf71",
             )
 
         suspend fun initialize(
