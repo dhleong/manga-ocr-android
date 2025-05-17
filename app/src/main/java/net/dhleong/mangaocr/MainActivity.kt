@@ -21,9 +21,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +51,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
+import net.dhleong.mangaocr.detector.TfliteMangaTextDetector
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
 import okio.FileNotFoundException
 import okio.buffer
@@ -60,11 +66,20 @@ class MainActivity : ComponentActivity() {
     private val manager: MangaOcrManager by lazy {
         MangaOcrManager(this, lifecycleScope, lifecycle)
     }
-    private val newDetector: Detector by lazy {
-        DetectorManager(this, lifecycleScope, lifecycle)
-    }
+    private val detectorsByProcessor =
+        TfliteMangaTextDetector.Processor.Type.entries.associateWith { processor ->
+            lazy { DetectorManager(this, lifecycleScope, lifecycle, processorType = processor) }
+        }
     private val oldDetector: Detector by lazy {
         DetectorManager(this, lifecycleScope, lifecycle, forceLegacy = true)
+    }
+
+    sealed interface DetectorType {
+        data object Old : DetectorType
+
+        data class New(
+            val processor: TfliteMangaTextDetector.Processor.Type,
+        ) : DetectorType
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,13 +90,21 @@ class MainActivity : ComponentActivity() {
             var lastBitmap: Bitmap? by remember { mutableStateOf(null) }
             var loading by remember { mutableStateOf(false) }
             var output by remember { mutableStateOf("") }
-            var useLegacyDetector by remember { mutableStateOf(false) }
+            var detectorType: DetectorType by remember {
+                mutableStateOf(
+                    DetectorType.New(TfliteMangaTextDetector.Processor.DEFAULT_TYPE),
+                )
+            }
 
             val onLoading: (Boolean) -> Unit = { loading = it }
             val onBitmap: (Bitmap) -> Unit = { lastBitmap = it }
             val onResult: (CharSequence) -> Unit = { output = it.toString() }
 
-            val detector = if (useLegacyDetector) oldDetector else newDetector
+            val detector: Detector =
+                when (val t = detectorType) {
+                    DetectorType.Old -> oldDetector
+                    is DetectorType.New -> detectorsByProcessor[t.processor]!!.value
+                }
 
             MangaOCRTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -111,11 +134,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Row {
-                            LabeledSwitch(
-                                label = "Legacy Detector",
-                                checked = useLegacyDetector,
-                                onCheckedChange = { useLegacyDetector = it },
-                            )
+                            DetectorSelectorDropdown(value = detectorType, onValueChanged = { detectorType = it })
                         }
 
                         lastBitmap?.let {
@@ -282,6 +301,55 @@ private fun Bitmap.mutate(): Bitmap {
     }
 
     return copy(Bitmap.Config.ARGB_8888, true)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("ktlint:standard:function-naming", "SameParameterValue")
+@Composable
+private fun DetectorSelectorDropdown(
+    value: MainActivity.DetectorType,
+    onValueChanged: (MainActivity.DetectorType) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = {
+            expanded = !expanded
+        },
+    ) {
+        TextField(
+            value =
+                when (value) {
+                    MainActivity.DetectorType.Old -> "Legacy"
+                    is MainActivity.DetectorType.New -> value.processor.name
+                },
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.menuAnchor(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(text = "Legacy") },
+                onClick = {
+                    onValueChanged(MainActivity.DetectorType.Old)
+                    expanded = false
+                },
+            )
+            TfliteMangaTextDetector.Processor.Type.entries.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(text = item.name) },
+                    onClick = {
+                        onValueChanged(MainActivity.DetectorType.New(item))
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Suppress("ktlint:standard:function-naming", "SameParameterValue")

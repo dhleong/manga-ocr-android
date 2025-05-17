@@ -22,11 +22,12 @@ interface Detector {
 
         suspend fun initialize(
             context: Context,
+            processorType: TfliteMangaTextDetector.Processor.Type = TfliteMangaTextDetector.Processor.DEFAULT_TYPE,
             fallback: Boolean = true,
         ): Detector =
             LoggingDetector(
                 try {
-                    TfliteMangaTextDetector.initialize(context)
+                    TfliteMangaTextDetector.initialize(context, processorType = processorType)
                 } catch (e: LoadingException) {
                     if (!fallback) {
                         throw e

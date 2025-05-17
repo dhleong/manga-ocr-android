@@ -29,6 +29,10 @@ class TfliteMangaTextDetector(
     private val primaryClassOnly: Boolean = false,
 ) : Detector {
     interface Processor {
+        companion object {
+            val DEFAULT_TYPE = Type.LETTERBOX
+        }
+
         enum class Type {
             OLD,
             LETTERBOX,
@@ -123,16 +127,23 @@ class TfliteMangaTextDetector(
         interpreter.run(processed.buffer, output.buffer)
 
         val rows =
-            output.mapRows { i ->
+            output.mapRows(quitEarlyOnNull = false) { i ->
                 val confidence = output[0, i, 4]
-                if (confidence < CONFIDENCE_THRESHOLD) {
+                val classIndex = output[0, i, 5].toInt()
+                val threshold =
+                    if (classIndex == 0) {
+                        SECONDARY_CONFIDENCE_THRESHOLD
+                    } else {
+                        CONFIDENCE_THRESHOLD
+                    }
+                if (confidence < threshold) {
                     return@mapRows null
                 }
 
                 val rect = processor.extractRect(output, bitmap, i)
                 Detector.Result(
                     bbox = Bbox(rect, confidence),
-                    classIndex = output[0, i, 5].toInt(),
+                    classIndex = classIndex,
                 )
             }
         return if (primaryClassOnly) {
@@ -143,6 +154,7 @@ class TfliteMangaTextDetector(
     }
 
     companion object {
+        private const val SECONDARY_CONFIDENCE_THRESHOLD = 0.7f
         private const val CONFIDENCE_THRESHOLD = 0.25f
 
         @Suppress("unused")
@@ -174,7 +186,7 @@ class TfliteMangaTextDetector(
         suspend fun initialize(
             context: Context,
             model: ModelPath = MODEL_INT8_WITH_DATA,
-            processorType: Processor.Type = Processor.Type.LETTERBOX_SELECTIVE,
+            processorType: Processor.Type = Processor.DEFAULT_TYPE,
         ): Detector =
             coroutineScope {
                 val modelFile =

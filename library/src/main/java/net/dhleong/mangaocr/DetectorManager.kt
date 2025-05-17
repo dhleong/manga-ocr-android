@@ -6,11 +6,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.dhleong.mangaocr.detector.TfliteMangaTextDetector
 
 class DetectorManager(
     context: Context,
     scope: LifecycleCoroutineScope,
     lifecycle: Lifecycle,
+    private val processorType: TfliteMangaTextDetector.Processor.Type = TfliteMangaTextDetector.Processor.DEFAULT_TYPE,
     private val forceLegacy: Boolean = false,
 ) : BaseManager<Detector>(context, scope, lifecycle),
     Detector {
@@ -18,7 +20,7 @@ class DetectorManager(
         if (forceLegacy) {
             Detector.initializeLegacy(context)
         } else {
-            Detector.initialize(context)
+            Detector.initialize(context, processorType = processorType)
         }
 
     override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
