@@ -2,10 +2,10 @@ package net.dhleong.mangaocr.detector
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.PointF
 import android.graphics.RectF
 import android.util.Log
 import com.google.android.gms.tflite.java.TfLite
+import com.google.common.primitives.Floats.min
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import net.dhleong.mangaocr.Detector
@@ -13,13 +13,13 @@ import net.dhleong.mangaocr.hub.HfHubRepo
 import net.dhleong.mangaocr.hub.ModelPath
 import net.dhleong.mangaocr.onnx.FloatTensor
 import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
+import net.dhleong.mangaocr.tflite.ResizeWithPadOp
 import net.dhleong.mangaocr.tflite.await
 import org.tensorflow.lite.InterpreterApi
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
-import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp
 
 class TfliteMangaTextDetector(
     private val interpreter: InterpreterApi,
@@ -74,14 +74,13 @@ class TfliteMangaTextDetector(
         private val targetWidth: Int,
         private val targetHeight: Int,
     ) : Processor {
-        private val resize = ResizeWithCropOrPadOp(targetHeight, targetWidth)
+        private val resize = ResizeWithPadOp(targetHeight, targetWidth)
         private val imageProcessor =
             ImageProcessor
                 .Builder()
                 .add(resize)
                 .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
                 .build()
-        private val pt = PointF()
 
         override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
@@ -90,15 +89,30 @@ class TfliteMangaTextDetector(
             bitmap: Bitmap,
             index: Int,
         ): RectF {
-            pt.set(output[0, index, 0] * targetWidth, output[0, index, 1] * targetHeight)
-            val topleft = resize.inverseTransform(pt, bitmap.height, bitmap.width)
-            val right = topleft.x
-            val bottom = topleft.y
+            val gain =
+                min(
+                    targetHeight / bitmap.height.toFloat(),
+                    targetWidth / bitmap.width.toFloat(),
+                )
+            val padX =
+                (targetWidth - bitmap.width * gain) / 2 - 0.1f
+            val padY =
+                (targetHeight - bitmap.height * gain) / 2 - 0.1f
 
-            pt.set(output[0, index, 2] * targetWidth, output[0, index, 3] * targetHeight)
-            val botright = resize.inverseTransform(pt, bitmap.height, bitmap.width)
-            val left = botright.x
-            val top = botright.y
+            val xn = output[0, index, 0] * targetWidth
+            val yn = output[0, index, 1] * targetHeight
+            val xm = output[0, index, 2] * targetWidth
+            val ym = output[0, index, 3] * targetHeight
+            val left = (xn - padX) / gain
+            val top = (yn - padY) / gain
+            val right = (xm - padX) / gain
+            val bottom = (ym - padY) / gain
+            Log.v(
+                "TfliteDetector",
+                "gain: $gain pad: $padX, $padY (${bitmap.width} x ${bitmap.height})" +
+                    " -> ${output[0, index, 0]} $xn $yn $xm $ym" +
+                    " => $left $top $right $bottom",
+            )
 
             return RectF(left, top, right, bottom)
         }
@@ -127,7 +141,7 @@ class TfliteMangaTextDetector(
     }
 
     companion object {
-        private const val CONFIDENCE_THRESHOLD = 0.05f
+        private const val CONFIDENCE_THRESHOLD = 0.25f
 
         @Suppress("unused")
         val MODEL_FLOAT32 =
@@ -158,7 +172,7 @@ class TfliteMangaTextDetector(
         suspend fun initialize(
             context: Context,
             model: ModelPath = MODEL_INT8_WITH_DATA,
-            processorType: Processor.Type = Processor.Type.OLD,
+            processorType: Processor.Type = Processor.Type.LETTERBOX,
         ): Detector =
             coroutineScope {
                 val modelFile =

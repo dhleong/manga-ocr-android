@@ -198,7 +198,7 @@ class MainActivity : ComponentActivity() {
         val lastClipboardFile = File(cacheDir, "last-clipboard.jpg")
         try {
             if (item == null) {
-                throw FileNotFoundException("No clip")
+                throw FileNotFoundException("Empty clipboard")
             }
             contentResolver.openInputStream(item).use { input ->
                 lastClipboardFile
