@@ -2,6 +2,7 @@ package net.dhleong.mangaocr.detector
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.graphics.RectF
 import android.util.Log
 import com.google.android.gms.tflite.java.TfLite
@@ -10,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import net.dhleong.mangaocr.Detector
 import net.dhleong.mangaocr.hub.HfHubRepo
 import net.dhleong.mangaocr.hub.ModelPath
+import net.dhleong.mangaocr.onnx.FloatTensor
 import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
 import net.dhleong.mangaocr.tflite.await
 import org.tensorflow.lite.InterpreterApi
@@ -17,32 +19,98 @@ import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
+import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp
 
 class TfliteMangaTextDetector(
     private val interpreter: InterpreterApi,
     private val targetWidth: Int = 640,
     private val targetHeight: Int = 640,
+    private val processor: Processor = LetterboxProcessor(targetWidth, targetHeight),
 ) : Detector {
-    override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
-        val imageProcessor =
+    interface Processor {
+        enum class Type {
+            OLD,
+            LETTERBOX,
+        }
+
+        fun preprocess(bitmap: Bitmap): TensorImage
+
+        fun extractRect(
+            output: FloatTensor,
+            bitmap: Bitmap,
+            index: Int,
+        ): RectF
+    }
+
+    class OldProcessor(
+        targetWidth: Int,
+        targetHeight: Int,
+    ) : Processor {
+        private val imageProcessor =
             ImageProcessor
                 .Builder()
                 .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
                 .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
                 .build()
-        val processed = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
-        // The YOLO model seems to output in xyxyn format,
-        // IE: normalized within the *original* width
-        val ratioX = bitmap.width
-        val ratioY = bitmap.height
+        override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
 
+        override fun extractRect(
+            output: FloatTensor,
+            bitmap: Bitmap,
+            index: Int,
+        ): RectF {
+            // The YOLO model seems to output in xyxyn format,
+            // IE: normalized within the *original* width
+            val left = output[0, index, 0] * bitmap.width
+            val top = output[0, index, 1] * bitmap.height
+            val right = output[0, index, 2] * bitmap.width
+            val bottom = output[0, index, 3] * bitmap.height
+            return RectF(left, top, right, bottom)
+        }
+    }
+
+    class LetterboxProcessor(
+        private val targetWidth: Int,
+        private val targetHeight: Int,
+    ) : Processor {
+        private val resize = ResizeWithCropOrPadOp(targetHeight, targetWidth)
+        private val imageProcessor =
+            ImageProcessor
+                .Builder()
+                .add(resize)
+                .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
+                .build()
+        private val pt = PointF()
+
+        override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
+
+        override fun extractRect(
+            output: FloatTensor,
+            bitmap: Bitmap,
+            index: Int,
+        ): RectF {
+            pt.set(output[0, index, 0] * targetWidth, output[0, index, 1] * targetHeight)
+            val topleft = resize.inverseTransform(pt, bitmap.height, bitmap.width)
+            val right = topleft.x
+            val bottom = topleft.y
+
+            pt.set(output[0, index, 2] * targetWidth, output[0, index, 3] * targetHeight)
+            val botright = resize.inverseTransform(pt, bitmap.height, bitmap.width)
+            val left = botright.x
+            val top = botright.y
+
+            return RectF(left, top, right, bottom)
+        }
+    }
+
+    override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
+        val processed = processor.preprocess(bitmap)
         val outputTensor = interpreter.getOutputTensor(0)
         Log.v("TfliteDetector", "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
 
         val output = interpreter.allocateFloatOutputTensor(0)
         interpreter.run(processed.buffer, output.buffer)
-        Log.v("TfliteDetector", "output: ${output.buffer.array().toList()}")
 
         return output.mapRows { i ->
             val confidence = output[0, i, 4]
@@ -50,13 +118,9 @@ class TfliteMangaTextDetector(
                 return@mapRows null
             }
 
-            val left = output[0, i, 0] * ratioX
-            val top = output[0, i, 1] * ratioY
-            val right = output[0, i, 2] * ratioX
-            val bottom = output[0, i, 3] * ratioY
-
+            val rect = processor.extractRect(output, bitmap, i)
             Detector.Result(
-                bbox = Bbox(RectF(left, top, right, bottom), confidence),
+                bbox = Bbox(rect, confidence),
                 classIndex = output[0, i, 5].toInt(),
             )
         }
@@ -94,6 +158,7 @@ class TfliteMangaTextDetector(
         suspend fun initialize(
             context: Context,
             model: ModelPath = MODEL_INT8_WITH_DATA,
+            processorType: Processor.Type = Processor.Type.OLD,
         ): Detector =
             coroutineScope {
                 val modelFile =
@@ -113,7 +178,14 @@ class TfliteMangaTextDetector(
                         },
                     )
 
-                TfliteMangaTextDetector(interpreter)
+                val targetWidth = 640
+                val targetHeight = 640
+                val processor =
+                    when (processorType) {
+                        Processor.Type.OLD -> OldProcessor(targetWidth, targetHeight)
+                        Processor.Type.LETTERBOX -> LetterboxProcessor(targetWidth, targetHeight)
+                    }
+                TfliteMangaTextDetector(interpreter, processor = processor)
             }
     }
 }
