@@ -1,4 +1,4 @@
-# manga-ocr-android
+# manga-ocr-android [![](https://jitpack.io/v/dhleong/manga-ocr-android.svg)](https://jitpack.io/#dhleong/manga-ocr-android)
 
 *Manga OCR made fast*
 
@@ -8,11 +8,11 @@ This repository is an attempt to port the work from [manga-ocr][manga-ocr] and [
 
 ## How?
 
-The library module is published via jitpack:
+The library module is published via jitpack. See badge above for latest version and extra install instructions.
 
 ```
 dependencies {
-    implementation 'com.github.dhleong:manga-ocr-android:a4f2a6c8f0'
+    implementation 'com.github.dhleong:manga-ocr-android:<latest-version>'
 }
 ```
 
@@ -25,5 +25,6 @@ I haven't done any real benchmarking, but anecdotally—yes! A quantized version
 A quantized version of the [manga-ocr][manga-ocr] model took about 110ms *per character* in the box. The current `MangaOcr` implementation in the library only takes about 10ms per character.
 
 [manga-ocr]: https://github.com/kha-white/manga-ocr
+[jitpack]: https://jitpack.io/#dhleong/manga-ocr-android
 [koharu]: https://github.com/mayocream/koharu
 [mihon]: https://mihon.app
