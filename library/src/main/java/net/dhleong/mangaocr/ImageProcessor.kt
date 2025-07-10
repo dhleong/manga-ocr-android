@@ -3,12 +3,9 @@ package net.dhleong.mangaocr
 // ImageProcessor.kt
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.ColorSpace
-import android.os.Build
 import android.util.Log
 import androidx.core.graphics.get
 import androidx.core.graphics.scale
-import androidx.core.graphics.toColorInt
 import java.nio.FloatBuffer
 
 class ImageProcessor<T>(
@@ -39,31 +36,22 @@ class ImageProcessor<T>(
         val h = resizedBitmap.height
         for (y in 0 until h) {
             for (x in 0 until w) {
-                var pixel = resizedBitmap[x, y]
+                val pixel = resizedBitmap[x, y]
+                var r: Int
+                var g: Int
+                var b: Int
 
-//                // NOTE: This *works* but seems less accurate than the original colors?
-//                // Translate [0, 1] -> [0, 255]
-//                val gray = Color.luminance(pixel) * 255f
                 if (grayscaleify) {
-//                    val gray = (Color.luminance(pixel) * 255f).toInt()
-//                    pixel = Color.argb(255, gray, gray, gray)
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        pixel =
-                            Color
-                                .convert(
-                                    pixel,
-                                    ColorSpace.get(ColorSpace.Named.BT2020_PQ),
-                                ).toColorInt()
-                    }
+                    // Translate [0, 1] -> [0, 255]
+                    val gray = (simpleLuminance(pixel) * 255).toInt()
+                    r = gray
+                    g = gray
+                    b = gray
+                } else {
+                    r = Color.red(pixel)
+                    g = Color.green(pixel)
+                    b = Color.blue(pixel)
                 }
-//                val r = gray
-//                val g = gray
-//                val b = gray
-
-                val r = Color.red(pixel)
-                val g = Color.green(pixel)
-                val b = Color.blue(pixel)
 
                 val ri = y * inputWidth + x
                 val gi = 1 * inputWidth * inputHeight + ri
@@ -87,6 +75,28 @@ class ImageProcessor<T>(
         // Koharu seems to preserve it, but for whatever reason... that doesn't work so well for us
         private const val PRESERVE_ASPECT = false
         private const val GRAYSCALEIFY = true
+
+        /**
+         * Extracts the visual luminance of a pixel Color, similar to [Color.luminance].
+         * The primary difference here is that [Color.luminance] does some additional transform
+         * on each channel to turn it into the sRGB color space. However, that seems to reduce
+         * OCR accuracy for already-black text, so we skip that here and just do the
+         * luminance math .
+         */
+        private fun simpleLuminance(color: Int): Double {
+            // NOTE: Color.luminance also converts the color [0, 255] -> [0, 1] *before*
+            // doing the luminance extraction below. However, anecdotally, doing it *after*
+            // that extraction seems to preserve slightly more accuracy.
+            val r = Color.red(color)
+            val g = Color.green(color)
+            val b = Color.blue(color)
+
+            val lr = (0.2126 * r) / 255.0
+            val lg = (0.7152 * g) / 255.0
+            val lb = (0.0722 * b) / 255.0
+
+            return lr + lg + lb
+        }
 
         fun Bitmap.resizeTo(
             inputWidth: Int,
