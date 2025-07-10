@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import androidx.core.graphics.applyCanvas
+import androidx.core.graphics.toRect
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
 import coil3.request.ImageRequest
@@ -82,6 +83,11 @@ class MainActivity : ComponentActivity() {
         ) : DetectorType
     }
 
+    private data class DetectResult(
+        val boxes: List<Detector.Result>,
+        val bitmap: Bitmap,
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -95,9 +101,11 @@ class MainActivity : ComponentActivity() {
                     DetectorType.New(TfliteMangaTextDetector.Processor.DEFAULT_TYPE),
                 )
             }
+            var detectResult by remember { mutableStateOf<DetectResult?>(null) }
 
             val onLoading: (Boolean) -> Unit = { loading = it }
             val onBitmap: (Bitmap) -> Unit = { lastBitmap = it }
+            val onDetect: (DetectResult?) -> Unit = { detectResult = it }
             val onResult: (CharSequence) -> Unit = { output = it.toString() }
 
             val detector: Detector =
@@ -106,30 +114,61 @@ class MainActivity : ComponentActivity() {
                     is DetectorType.New -> detectorsByProcessor[t.processor]!!.value
                 }
 
+            val doProcess: (Int) -> Unit = { index ->
+                onDetect(null)
+                process(index, onLoading, onBitmap, onResult)
+            }
+
+            val ocrFromResults: (DetectResult) -> Unit = { result ->
+                lifecycleScope.launch {
+                    val finalResults = StringBuilder()
+                    for (rect in result.boxes) {
+                        val region = rect.bbox.rect.toRect()
+                        val b = Bitmap.createBitmap(result.bitmap, region.left, region.top, region.width(), region.height())
+                        processBitmap(b, onLoading, onBitmap) { ocr, isFinal ->
+                            if (isFinal) {
+                                finalResults.append(ocr)
+                                finalResults.append("\n")
+                                onResult(finalResults)
+                            } else {
+                                onResult("$finalResults$ocr")
+                            }
+                        }
+                    }
+                }
+            }
+
             MangaOCRTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(modifier = Modifier.padding(innerPadding)) {
                         if (USE_REAL_IMAGE) {
                             Row {
                                 for (i in 0..5) {
-                                    Button(onClick = { process(i, onLoading, onBitmap, onResult) }) {
+                                    Button(onClick = { doProcess(i) }) {
                                         Text("#$i")
                                     }
                                 }
                             }
                         } else {
-                            Button(onClick = { process(0, onLoading, onBitmap, onResult) }) {
-                                Text("Hi")
+                            Button(onClick = { doProcess(0) }) {
+                                Text("OCR")
                             }
                         }
 
                         Row {
-                            Button(onClick = { processDetection(detector, onLoading, onBitmap, onResult) }) {
+                            Button(onClick = { processDetection(detector, onLoading, onBitmap, onDetect, onResult) }) {
                                 Text("Detect")
                             }
 
-                            Button(onClick = { detectClipboard(detector, onLoading, onBitmap, onResult) }) {
+                            Button(onClick = { detectClipboard(detector, onLoading, onBitmap, onDetect, onResult) }) {
                                 Text("Detect Clipboard")
+                            }
+
+                            // NOTE: Compiler won't let us just use smart casting here:
+                            detectResult?.let { result ->
+                                Button(onClick = { ocrFromResults(result) }) {
+                                    Text("-> OCR")
+                                }
                             }
                         }
 
@@ -181,31 +220,45 @@ class MainActivity : ComponentActivity() {
                     loadBitmap("https://github.com/kha-white/manga-ocr/raw/master/assets/examples/0$index.jpg")
                 }
 
-            setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(224, 224))
-            manager
-                .process(bitmap)
-                .collect { event ->
-                    withContext(Dispatchers.Main) {
-                        when (event) {
-                            is MangaOcr.Result.Partial -> {
-                                setResult(event.text)
-                            }
+            processBitmap(bitmap, setLoading, setBitmap) { text, isFinal ->
+                setResult(text)
+            }
+        }
+    }
 
-                            is MangaOcr.Result.FinalResult -> {
-                                setResult(event.text)
-                            }
+    private suspend fun processBitmap(
+        bitmap: Bitmap,
+        setLoading: (Boolean) -> Unit,
+        setBitmap: (Bitmap) -> Unit,
+        setResult: (CharSequence, isFinal: Boolean) -> Unit,
+    ) {
+        setLoading(true)
+
+        setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(224, 224))
+        manager
+            .process(bitmap)
+            .collect { event ->
+                withContext(Dispatchers.Main) {
+                    when (event) {
+                        is MangaOcr.Result.Partial -> {
+                            setResult(event.text, false)
+                        }
+
+                        is MangaOcr.Result.FinalResult -> {
+                            setResult(event.text, true)
                         }
                     }
                 }
+            }
 
-            setLoading(false)
-        }
+        setLoading(false)
     }
 
     private fun detectClipboard(
         detector: Detector,
         setLoading: (Boolean) -> Unit,
         setBitmap: (Bitmap) -> Unit,
+        setDetection: (DetectResult?) -> Unit,
         setResult: (CharSequence) -> Unit,
     ) {
         val service = requireNotNull(getSystemService<ClipboardManager>())
@@ -234,7 +287,7 @@ class MainActivity : ComponentActivity() {
         try {
             lastClipboardFile.inputStream().buffered().use { input ->
                 val bitmap = BitmapFactory.decodeStream(input)
-                processDetection(detector, setLoading, setBitmap, setResult, bitmap)
+                processDetection(detector, setLoading, setBitmap, setDetection, setResult, bitmap)
             }
         } catch (e: FileNotFoundException) {
             Toast.makeText(this, "No clip", Toast.LENGTH_SHORT).show()
@@ -245,6 +298,7 @@ class MainActivity : ComponentActivity() {
         detector: Detector,
         setLoading: (Boolean) -> Unit,
         setBitmap: (Bitmap) -> Unit,
+        setDetection: (DetectResult) -> Unit,
         setResult: (CharSequence) -> Unit,
         bitmap: Bitmap? = null,
     ) {
@@ -275,6 +329,7 @@ class MainActivity : ComponentActivity() {
                 },
             )
             setResult("Done.")
+            setDetection(DetectResult(boxes, bitmap))
 
             setLoading(false)
         }
