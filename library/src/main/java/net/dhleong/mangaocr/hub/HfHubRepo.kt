@@ -3,6 +3,7 @@ package net.dhleong.mangaocr.hub
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -29,11 +30,13 @@ class HfHubRepo(
         revision: String = "main",
         sha256: String? = null,
     ): File {
+        val (org, repo) = name.split("/", limit = 2)
         val uri =
-            Uri
-                .parse(endpoint)
+            endpoint
+                .toUri()
                 .buildUpon()
-                .appendPath(name)
+                .appendPath(org)
+                .appendPath(repo)
                 .appendPath("resolve")
                 .appendPath(revision)
                 .appendPath(repoPath)
@@ -45,7 +48,7 @@ class HfHubRepo(
             return localPath
         }
 
-        Log.v("HUB", "Downloading $repoPath")
+        Log.v("HUB", "Downloading $repoPath ($uri)")
 
         // NOTE: localPath.parentFile *may* not be the same as parent
         requireNotNull(localPath.parentFile).mkdirs()
