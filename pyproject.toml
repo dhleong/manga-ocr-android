@@ -22,6 +22,7 @@ dependencies = [
 
 [tool.pyright]
 venv = '.venv'
+venvPath = './'
 
 [tool.pyrefly]
 python-interpreter-path = '.venv/bin/python3'

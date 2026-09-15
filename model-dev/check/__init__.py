@@ -3,6 +3,7 @@ from typing import Optional
 
 import click
 import download
+import torch
 
 
 @click.group()
@@ -22,10 +23,11 @@ def yolo(path: Optional[Path] = None):
     results = model(
         path or "https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg"
     )
+
     assert isinstance(results, list)
     for result in results:
         # type checkers struggling...:
-        if not hasattr(result, "boxes") or not hasattr(result, "show"):
+        if isinstance(result, torch.Tensor):
             raise ValueError("Expected Results object; got", result)
         print(result.__dict__)
         print(result.boxes)
