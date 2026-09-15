@@ -27,7 +27,7 @@ The second splits the Encoder-Decoder model from [manga-ocr][manga-ocr] and quan
 
 ## Activating the venv
 
-Helpful for getting editors to find dependencies:
+Helpful for getting editors (and type checkers) to find dependencies:
 
 ```
 uv venv  # You only need to do this once, to create the venv

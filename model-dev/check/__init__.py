@@ -15,7 +15,12 @@ def yolo():
     results = model(
         "https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg"
     )
-    result = results[0]
-    print(result.__dict__)
-    print(result.boxes)
-    result.show()
+    assert isinstance(results, list)
+    for result in results:
+        # type chekcers struggling...:
+        if not hasattr(result, "boxes") or not hasattr(result, "show"):
+            raise ValueError("Expected Results object; got", result)
+        print(result.__dict__)
+        print(result.boxes)
+        result.show()
+        break

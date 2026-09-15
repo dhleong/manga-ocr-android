@@ -20,5 +20,9 @@ dependencies = [
     "ipython (>=9.2.0,<10.0.0)",
 ]
 
+[tool.pyright]
+venv = '.venv'
+
 [tool.pyrefly]
+python-interpreter-path = '.venv/bin/python3'
 search-path = ['model-dev']
