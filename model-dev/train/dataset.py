@@ -168,7 +168,7 @@ def load_vocab() -> Vocab:
 def download_manga109s():
     return download.hf_unzip(
         "hal-utokyo/Manga109-s",
-        "Manga109s_released_2023_12_07.zip",
+        "Manga109s_released_2026_05_21.zip",
         repo_type="dataset",
     )
 

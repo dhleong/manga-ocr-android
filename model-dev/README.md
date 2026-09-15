@@ -34,6 +34,14 @@ uv venv  # You only need to do this once, to create the venv
 source .venv/bin/activate
 ```
 
+## manga109 dataset
+
+You'll need to request access yourself; once done, you can authenticate using:
+
+```
+uv run huggingface-cli login
+```
+
 [install-uv]: https://docs.astral.sh/uv/getting-started/installation
 [hf]: https://huggingface.co
 [manga-ocr]: https://github.com/kha-white/manga-ocr
