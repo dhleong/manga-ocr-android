@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Optional
+
 import click
 import download
 
@@ -7,17 +10,21 @@ def check(): ...
 
 
 @check.command()
-def yolo():
+@click.option(
+    "--path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+)
+def yolo(path: Optional[Path] = None):
     yolov8 = download.hf("ogkalu/manga-text-detector-yolov8s", "manga-text-detector.pt")
     import ultralytics
 
     model = ultralytics.YOLO(str(yolov8))
     results = model(
-        "https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg"
+        path or "https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg"
     )
     assert isinstance(results, list)
     for result in results:
-        # type chekcers struggling...:
+        # type checkers struggling...:
         if not hasattr(result, "boxes") or not hasattr(result, "show"):
             raise ValueError("Expected Results object; got", result)
         print(result.__dict__)
