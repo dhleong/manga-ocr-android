@@ -41,29 +41,40 @@ def yolo(path: Optional[Path] = None):
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
 )
 def koharu(path: Optional[Path] = None):
-    from huggingface_hub import snapshot_download
-    from safetensors.torch import load_file
-    from ultralytics import YOLO
+    import importlib.util
 
-    root = Path(
-        snapshot_download(
-            "mayocream/koharu-yolo26s",
-            allow_patterns=["*.safetensors", "*.yaml", "*.json"],
-        )
+    import numpy as np
+    from PIL import Image
+
+    weights = download.hf(
+        "mayocream/koharu-layout-rfdetr-seg-2xl-1152",
+        "model.safetensors",
+        outputs_path="koharu-seg",
     )
-    config = json.loads((root / "config.json").read_text())
-    model = YOLO(root / "yolo26s-seg.yaml", task="segment")
-    assert model.model
-    assert not isinstance(model.model, str)
-    model.model.load_state_dict(load_file(root / "model.safetensors"), strict=True)
-    model.model.names = {int(key): value for key, value in config["names"].items()}
+    loader_path = download.hf(
+        "mayocream/koharu-layout-rfdetr-seg-2xl-1152",
+        "load_model.py",
+        outputs_path="koharu-seg",
+    )
+    spec = importlib.util.spec_from_file_location("koharu_layout_loader", loader_path)
+    loader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(loader)
+    model = loader.load_model(weights)
 
-    results = model.predict(path or DEFAULT_PATH, imgsz=1280, conf=0.25)
-    assert isinstance(results, list)
-    result = results[0]
-    # type checkers struggling...:
-    if isinstance(result, torch.Tensor):
-        raise ValueError("Expected Results object; got", result)
-    print(result.__dict__)
-    print(result.boxes)
-    result.show()
+    image = Image.open(path or DEFAULT_PATH).convert("RGB")
+    detections = model.predict(
+        image,
+        threshold=0.20,
+        shape=(1152, 1152),
+        include_source_image=False,
+    )
+
+    class_thresholds = {0: 0.25, 1: 0.20, 2: 0.50, 3: 0.50}
+    keep = np.asarray(
+        [
+            score >= class_thresholds[int(class_id)]
+            for class_id, score in zip(detections.class_id, detections.confidence)
+        ]
+    )
+    detections = detections[keep]
+    print(detections)
