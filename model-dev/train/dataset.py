@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 import click
+
 import download
 from const import OUTPUTS
 
@@ -177,6 +178,18 @@ def download_segmentation_annotations():
     path = download.hf(
         "mayocream/manga109-segmentation",
         "annotations/test.coco.json",
+        repo_type="dataset",
+        outputs_path="manga109-segmentation",
+    )
+    download.hf(
+        "mayocream/manga109-segmentation",
+        "annotations/train.coco.json",
+        repo_type="dataset",
+        outputs_path="manga109-segmentation",
+    )
+    download.hf(
+        "mayocream/manga109-segmentation",
+        "annotations/validation.coco.json",
         repo_type="dataset",
         outputs_path="manga109-segmentation",
     )

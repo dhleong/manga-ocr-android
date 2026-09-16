@@ -2,12 +2,22 @@ import shutil
 from pathlib import Path
 
 import click
+
 import download
 from const import OUTPUTS
 
 
 @click.group()
 def convert(): ...
+
+
+@convert.command()
+@click.option("--recreate", is_flag=True, default=False)
+def coco_to_yolo(recreate: bool):
+    from convert.coco_to_yolo import coco_to_yolo as convert
+
+    path = convert(recreate=recreate)
+    print(path)
 
 
 @convert.command()
