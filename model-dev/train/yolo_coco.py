@@ -1,13 +1,20 @@
 import shutil
 from pathlib import Path
 
-from const import OUTPUTS
+from const import OUTPUTS, YoloModelSize
+
+PROJECT_DIR = OUTPUTS / "yolo-coco-training"
+
+
+def get_model_path(model_size: YoloModelSize):
+    model_dir = PROJECT_DIR / f"manga109-coco-{model_size}"
+    return model_dir / "weights" / "best.pt"
 
 
 def train_yolo(
     *,
     dataset_dir: Path,
-    model_size: str,
+    model_size: YoloModelSize,
     epochs: int,
     imgsz: int,
     batch_size: int,
@@ -17,11 +24,11 @@ def train_yolo(
 
     from ultralytics import YOLO
 
-    project_dir = OUTPUTS / "yolo-coco-training"
-    model_dir = project_dir / f"manga109-coco-{model_size}"
-    best_model_path = model_dir / "weights" / "best.pt"
-
+    best_model_path = get_model_path(model_size)
     if not best_model_path.exists() or retrain:
+        if not retrain:
+            print(f"Model-{model_size} not found @ {best_model_path}")
+
         print(f"Training YOLO{model_size} on {dataset_dir}")
 
         # Check dataset exists
@@ -42,7 +49,7 @@ def train_yolo(
             epochs=epochs,
             imgsz=imgsz,
             batch=batch_size,
-            project=str(project_dir),
+            project=str(PROJECT_DIR),
             name=f"manga109-coco-{model_size}",
             exist_ok=True,
             verbose=True,
@@ -64,7 +71,13 @@ def export_to_tflite(
     model_size: str,
     imgsz: int,
     model_path: Path,
+    retrain: bool,
 ):
+    output_path = OUTPUTS / f"manga109-yolo{model_size}.tflite"
+    if output_path.exists() and not retrain:
+        print(f"Found tflite model @{output_path}")
+        return output_path
+
     from ultralytics import YOLO
 
     # Export to TFLite
@@ -85,7 +98,6 @@ def export_to_tflite(
     )
 
     export_path = Path(export_path)
-    output_path = OUTPUTS / f"manga109-yolo{model_size}.tflite"
 
     shutil.move(str(export_path), str(output_path))
 
@@ -99,7 +111,7 @@ def export_to_tflite(
 def build_yolo(
     *,
     dataset_dir: Path,
-    model_size: str,
+    model_size: YoloModelSize,
     epochs: int,
     imgsz: int,
     batch_size: int,
@@ -114,8 +126,10 @@ def build_yolo(
         retrain=retrain,
     )
     assert model_pt_path, "No model output"
+
     export_to_tflite(
         model_size=model_size,
         imgsz=imgsz,
         model_path=model_pt_path,
+        retrain=retrain,
     )

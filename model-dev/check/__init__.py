@@ -1,10 +1,12 @@
-import json
 from pathlib import Path
 from typing import Optional
 
 import click
-import download
 import torch
+
+import download
+import options
+from const import YoloModelSize
 
 DEFAULT_PATH = "https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg"
 
@@ -23,6 +25,33 @@ def yolo(path: Optional[Path] = None):
     import ultralytics
 
     model = ultralytics.YOLO(str(yolov8))
+    results = model(path or DEFAULT_PATH)
+
+    assert isinstance(results, list)
+    result = results[0]
+    # type checkers struggling...:
+    if isinstance(result, torch.Tensor):
+        raise ValueError("Expected Results object; got", result)
+    print(result.__dict__)
+    print(result.boxes)
+    result.show()
+
+
+@check.command()
+@options.yolo_model_size()
+@click.option(
+    "--path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+)
+def yolo_coco(model_size: YoloModelSize, path: Optional[Path] = None):
+    import ultralytics
+
+    from train.yolo_coco import get_model_path
+
+    model_path = get_model_path(model_size)
+    assert model_path.exists(), f"Train the model first (looked for {model_path})"
+
+    model = ultralytics.YOLO(str(model_path))
     results = model(path or DEFAULT_PATH)
 
     assert isinstance(results, list)
