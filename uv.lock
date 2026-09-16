@@ -59,8 +59,10 @@ dependencies = [
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/0e/5aa92ff23c29f9f62fd6d6ac9b4f1bd357388c6da28c1c92d8dc08897d74/ai_edge_litert_nightly-2.3.0.dev20260914-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:58aa53bfb7d22873b9278589617e1620866fe74fbb44d6f9e37b66ed39a8196b", size = 11076268, upload-time = "2026-09-15T04:00:36.896Z" },
     { url = "https://files.pythonhosted.org/packages/6b/ff/42515df932c0b92333f5fc818cb846338c792c4b6f9465d0f385564c38db/ai_edge_litert_nightly-2.3.0.dev20260914-cp312-cp312-manylinux_2_27_aarch64.whl", hash = "sha256:c1c8b4a2d5781fd394d369e7e775281e8ec6f35eea4ff2f2a5400fa4aab213ee", size = 14219392, upload-time = "2026-09-15T04:18:40.128Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/76/27facce4438191ac55a2c1b69f4ef019732ff8cd43fb66e2bbcdbf056616/ai_edge_litert_nightly-2.3.0.dev20260914-cp312-cp312-win_amd64.whl", hash = "sha256:b8e79b53c81a71994b307078a7537d0f5fc93225eadae273515ae7eea6cfd523", size = 18109538, upload-time = "2026-09-15T17:28:03.509Z" },
     { url = "https://files.pythonhosted.org/packages/75/b8/ab5900f7d4642c64891813bc99289f98edf7d55dcfd47fe8e53e6874836d/ai_edge_litert_nightly-2.3.0.dev20260914-cp313-cp313-macosx_12_0_arm64.whl", hash = "sha256:8ff12e680d7fe72d05492b682dd661c28ce6772f0b41f64c809d9f10424de9b0", size = 11076341, upload-time = "2026-09-15T04:00:38.754Z" },
     { url = "https://files.pythonhosted.org/packages/73/3a/f8b8384f4c7f287fd993ea8f091eda321c2f3f7b53056c65060a73a81286/ai_edge_litert_nightly-2.3.0.dev20260914-cp313-cp313-manylinux_2_27_aarch64.whl", hash = "sha256:c79f62c19092a9aa28a2ec18b9f81493e92e73fe0a744e5ec0f6b79ce0b888b2", size = 14220380, upload-time = "2026-09-15T04:18:42.455Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/78/ec2f84e06a147b91eadbb76fd63d8b545860504a3d92d8c081c3f7d83998/ai_edge_litert_nightly-2.3.0.dev20260914-cp313-cp313-win_amd64.whl", hash = "sha256:4d4c2ecd198f90f1b3b35f67188803744d3827497ec636fd2d79d22186ee009a", size = 18109685, upload-time = "2026-09-15T17:28:05.431Z" },
     { url = "https://files.pythonhosted.org/packages/dc/a4/3253bd110ae1dd26078d744ed1490b48d091f34ca90135758111861778fe/ai_edge_litert_nightly-2.3.0.dev20260914-cp314-cp314-macosx_12_0_arm64.whl", hash = "sha256:39f083b60a43938eb834e009d0155b23395cc432f7c71cc5d72a329644b50dbe", size = 11077144, upload-time = "2026-09-15T04:00:40.639Z" },
     { url = "https://files.pythonhosted.org/packages/a7/67/b6a091eb941a2e3613849464ce1d554069ef99d5557d146cf822b10d5886/ai_edge_litert_nightly-2.3.0.dev20260914-cp314-cp314-manylinux_2_27_aarch64.whl", hash = "sha256:7a138551975d5cc25f361daf26ec172f0777861a41b680bb2600f390bee2fb06", size = 14220383, upload-time = "2026-09-15T04:18:44.253Z" },
 ]
@@ -1114,6 +1116,7 @@ dependencies = [
     { name = "onnxscript" },
     { name = "torch" },
     { name = "transformers" },
+    { name = "types-tensorflow" },
     { name = "ultralytics" },
     { name = "unidic-lite" },
 ]
@@ -1131,6 +1134,7 @@ requires-dist = [
     { name = "onnxscript", specifier = ">=0.2.5,<0.3.0" },
     { name = "torch", specifier = ">=2.7.0,<3.0.0" },
     { name = "transformers", specifier = ">=4.51.3,<5.0.0" },
+    { name = "types-tensorflow", specifier = ">=2.18.0.20260827" },
     { name = "ultralytics", specifier = ">=8.3.124,<9.0.0" },
     { name = "unidic-lite", specifier = ">=1.0.8,<2.0.0" },
 ]
@@ -2647,6 +2651,29 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/93/d9/08c75f3459f19ad00425b564058e40efa4bcd79b816064cf27499303ea42/triton-3.8.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:387dae4cb0089a7b6ba1a428ae0782b65c4c58f57d94617cb22ca8593d8ccbca", size = 247972313, upload-time = "2026-08-28T15:56:14.007Z" },
     { url = "https://files.pythonhosted.org/packages/7c/34/429c5592181cfb7361a0a8e0bff218e7224b726709d75da2472b3e819f70/triton-3.8.0-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1b84e7d512490ba529111260fa6f7cad8b254a6bb5fbdf41d5ef9a5e57f52d0a", size = 226591133, upload-time = "2026-08-28T16:09:02.271Z" },
     { url = "https://files.pythonhosted.org/packages/fe/d1/aa8a3e935c37efee7945984fdb64d7e0851bf6d920afd97b2d21f9d23360/triton-3.8.0-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:74217bb56ed8692759227758e4c4b3bd2d608a209c1a7a081bf361fb4c2c1bf9", size = 248077577, upload-time = "2026-08-28T15:56:24.94Z" },
+]
+
+[[package]]
+name = "types-protobuf"
+version = "7.35.1.20260906"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/6c/e3e5b3e10bc328126a39637c138f9ebfd734bf14342b9f3540039b4ab995/types_protobuf-7.35.1.20260906.tar.gz", hash = "sha256:efd1a3862d4c967dad5512ef8d56b1530ac84f182c41735b94004756518c4998", size = 69895, upload-time = "2026-09-06T06:35:28.308Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/44/4e/f63e826c68f77ef875506d72f225918800346545ee99847bc28f3394f18d/types_protobuf-7.35.1.20260906-py3-none-any.whl", hash = "sha256:5155e48569e0dabff303fdf578db96cd31ea9a4a63b18018a4ceac6b0ae17462", size = 86419, upload-time = "2026-09-06T06:35:27.247Z" },
+]
+
+[[package]]
+name = "types-tensorflow"
+version = "2.18.0.20260827"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "requests" },
+    { name = "types-protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/13/73880d3cc2051f33552423032832da0933ee21d818c5aecb2bcef624c488/types_tensorflow-2.18.0.20260827.tar.gz", hash = "sha256:c520bca32249a59ed0259987a95bb6ab4cb9a0d492b1a9604437630edc433398", size = 260668, upload-time = "2026-08-27T12:07:29.206Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/c6/21ae388b27968b7b8adef052b82a9bcbf6ca44c417eaa6991edb45dde1c9/types_tensorflow-2.18.0.20260827-py3-none-any.whl", hash = "sha256:3cdd6b57feafca966f4c839edfe29602772c8301c4aa493c379eef38e3b7f0da", size = 330854, upload-time = "2026-08-27T12:07:28.166Z" },
 ]
 
 [[package]]

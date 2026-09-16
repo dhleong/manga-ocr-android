@@ -1,5 +1,6 @@
 import zipfile
-from typing import Literal, Optional
+from pathlib import Path
+from typing import Literal, Optional, Union
 
 import huggingface_hub as hub
 from const import OUTPUTS
@@ -7,13 +8,19 @@ from const import OUTPUTS
 KOHARU = "mayocream/koharu"
 
 
-def hf(repo: str, file: str, repo_type: Optional[Literal["dataset", "model"]] = None):
+def hf(
+    repo: str,
+    file: str,
+    repo_type: Optional[Literal["dataset", "model"]] = None,
+    outputs_path: Optional[Union[Path, str]] = None,
+):
+    path = OUTPUTS / (outputs_path or ".")
     for i in range(0, 1):
         try:
             print(f"Downloading {repo}/{file}...")
             OUTPUTS.mkdir(parents=True, exist_ok=True)
-            hub.hf_hub_download(repo, file, local_dir=OUTPUTS, repo_type=repo_type)
-            return (OUTPUTS / file).absolute()
+            hub.hf_hub_download(repo, file, local_dir=path, repo_type=repo_type)
+            return (path / file).absolute()
         except (hub.errors.RepositoryNotFoundError, hub.errors.GatedRepoError):
             if i > 0:
                 print("No auth after login; giving up :(")
@@ -24,6 +31,8 @@ def hf(repo: str, file: str, repo_type: Optional[Literal["dataset", "model"]] = 
             print("You can get a token from: https://huggingface.co/settings/tokens")
             hub.login(new_session=False)
             print("Logged in; trying again...")
+
+    raise ValueError("Impossible.")
 
 
 def hf_unzip(

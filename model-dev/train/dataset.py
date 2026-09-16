@@ -173,6 +173,16 @@ def download_manga109s():
     )
 
 
+def download_segmentation_annotations():
+    path = download.hf(
+        "mayocream/manga109-segmentation",
+        "annotations/test.coco.json",
+        repo_type="dataset",
+        outputs_path="manga109-segmentation",
+    )
+    return path.parent
+
+
 def build_yolo_dataset(*, recreate: bool = False, size: int = 8):
     from PIL import Image
 
