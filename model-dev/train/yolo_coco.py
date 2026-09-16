@@ -5,6 +5,9 @@ from const import OUTPUTS, YoloModelSize
 
 PROJECT_DIR = OUTPUTS / "yolo-coco-training"
 
+# YOLO_VERSION = "v8"
+YOLO_VERSION = "26"
+
 
 def get_model_path(model_size: YoloModelSize):
     model_dir = PROJECT_DIR / f"manga109-coco-{model_size}"
@@ -37,10 +40,17 @@ def train_yolo(
             print(f"Error: Dataset YAML not found at {yaml_path}")
             return
 
-        # Load YOLO model
-        model_name = f"yolov8{model_size}"
+        # Load a pretrained model
+        model_name = f"yolo{YOLO_VERSION}{model_size}"
+        model_filename = f"{model_name}.pt"
         print(f"Loading model {model_name}...")
-        model = YOLO(model_name + ".pt")
+        model_path = OUTPUTS / model_filename
+        if not model_path.exists():
+            # This constructor downloads a pretrained model to the current dir
+            print(f"Downloading pretrained {model_name}")
+            model = YOLO(model_filename)
+            Path(model_filename).rename(model_path)
+        model = YOLO(model_path)
 
         # Train
         print(f"Training for {epochs} epochs...")

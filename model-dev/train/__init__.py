@@ -22,7 +22,7 @@ def manga109s():
 
 @train.command()
 @options.yolo_model_size()
-@click.option("--epochs", type=int, default=50, help="Number of training epochs")
+@click.option("--epochs", type=int, default=150, help="Number of training epochs")
 @click.option("--imgsz", type=int, default=640, help="Image size for training")
 @click.option("--batch-size", type=int, default=16, help="Batch size")
 def yolo_coco(
