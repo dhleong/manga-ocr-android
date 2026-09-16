@@ -83,7 +83,7 @@ def convert_coco_to_yolo(
     num_annotations_processed = 0
 
     # Process each image
-    for img_id, img_info in image_info.items():
+    for i, (img_id, img_info) in enumerate(image_info.items()):
         file_name = cast(str, img_info["file_name"])
         source_path = input_base / file_name
 
@@ -92,7 +92,7 @@ def convert_coco_to_yolo(
             continue
 
         # Copy image to output
-        dest_image_path = images_dir / source_path.name
+        dest_image_path = images_dir / f"{i:05d}{source_path.suffix}"
         if not dest_image_path.exists():
             shutil.copy2(source_path, dest_image_path)
 
