@@ -160,7 +160,7 @@ def coco_to_yolo(recreate: bool = False):
     output_dir = OUTPUTS / "yolo-coco-dataset"
     yaml_path = output_dir / "dataset.yaml"
     if yaml_path.exists() and not recreate:
-        return
+        return output_dir
     elif yaml_path.exists():
         print("Recreating...")
 
@@ -199,8 +199,8 @@ def coco_to_yolo(recreate: bool = False):
 
     yaml_content = f"""
 path: {output_dir}
-train: train/images
-val: val/images
+train: images/train
+val: images/val
 
 names:
 """.lstrip()
@@ -208,3 +208,4 @@ names:
         yaml_content += f"  {idx}: {name}\n"
 
     yaml_path.write_text(yaml_content)
+    return output_dir

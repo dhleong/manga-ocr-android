@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Model dev for manga-ocr-android"
 readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+    "litert-torch>=0.9.0",
+]
 
 [tool.pyright]
 venv = '.venv'
