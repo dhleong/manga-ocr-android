@@ -8,4 +8,4 @@ OUTPUTS = __DEV_ROOT__ / "outputs"
 
 YoloModelSize = Literal["n", "s", "m", "l", "x"]
 YOLO_MODEL_SIZES = {"n", "s", "m", "l", "x"}
-DEFAULT_YOLO_SIZE = "m"
+DEFAULT_YOLO_SIZE = "s"

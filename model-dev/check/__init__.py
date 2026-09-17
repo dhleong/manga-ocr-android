@@ -107,3 +107,28 @@ def koharu(path: Optional[Path] = None):
     )
     detections = detections[keep]
     print(detections)
+
+
+@check.command()
+@click.option(
+    "--path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+)
+def best_epoch(path: Path):
+    import pandas as pd
+
+    # Load the training log
+    results = pd.read_csv(path)
+
+    # Strip spaces
+    results.columns = results.columns.str.strip()
+
+    # Calculate fitness
+    results["fitness"] = (
+        results["metrics/mAP50(B)"] * 0.1 + results["metrics/mAP50-95(B)"] * 0.9
+    )
+
+    # Find the epoch with the highest fitness
+    best_epoch = results["fitness"].idxmax() + 1
+
+    print(f"Best model was saved at epoch: {best_epoch}")

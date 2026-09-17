@@ -59,6 +59,7 @@ def train_yolo(
             epochs=epochs,
             imgsz=imgsz,
             batch=batch_size,
+            device="mps",  # enables apple silicon
             project=str(PROJECT_DIR),
             name=f"manga109-coco-{model_size}",
             exist_ok=True,

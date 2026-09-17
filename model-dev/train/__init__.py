@@ -22,14 +22,21 @@ def manga109s():
 
 @train.command()
 @options.yolo_model_size()
-@click.option("--epochs", type=int, default=150, help="Number of training epochs")
+@click.option("--epochs", type=int, default=50, help="Number of training epochs")
 @click.option("--imgsz", type=int, default=640, help="Image size for training")
 @click.option("--batch-size", type=int, default=16, help="Batch size")
+@click.option(
+    "--retrain/--no-retrain",
+    type=bool,
+    default=False,
+    help="Recreate an existing output",
+)
 def yolo_coco(
     model_size: YoloModelSize,
     epochs: int,
     imgsz: int,
     batch_size: int,
+    retrain: bool,
 ):
     """Train YOLO model on COCO-converted data and export to TFLite."""
     from convert.coco_to_yolo import coco_to_yolo as prepare_dataset
@@ -44,4 +51,5 @@ def yolo_coco(
         epochs=epochs,
         imgsz=imgsz,
         batch_size=batch_size,
+        retrain=retrain,
     )
