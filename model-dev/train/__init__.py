@@ -1,10 +1,7 @@
-import shutil
-from pathlib import Path
-
 import click
 
 import options
-from const import OUTPUTS, YoloModelSize
+from const import YoloModelSize
 from train import dataset
 
 
