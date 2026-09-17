@@ -4,6 +4,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.util.Log
+import androidx.collection.IntFloatMap
+import androidx.collection.IntSet
+import androidx.collection.intFloatMapOf
+import androidx.collection.intSetOf
 import com.google.android.gms.tflite.java.TfLite
 import com.google.common.primitives.Floats.min
 import kotlinx.coroutines.async
@@ -23,10 +27,10 @@ import org.tensorflow.lite.support.image.ops.ResizeOp
 
 class TfliteMangaTextDetector(
     private val interpreter: InterpreterApi,
+    private val model: ModelConfig,
     private val targetWidth: Int = 640,
     private val targetHeight: Int = 640,
     private val processor: Processor = LetterboxProcessor(targetWidth, targetHeight),
-    private val primaryClassOnly: Boolean = false,
 ) : Detector {
     interface Processor {
         companion object {
@@ -121,6 +125,8 @@ class TfliteMangaTextDetector(
     override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
         val processed = processor.preprocess(bitmap)
         val outputTensor = interpreter.getOutputTensor(0)
+
+        Log.v("TfliteDetector", "output tensors: ${interpreter.outputTensorCount}")
         Log.v("TfliteDetector", "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
 
         val output = interpreter.allocateFloatOutputTensor(0)
@@ -131,11 +137,8 @@ class TfliteMangaTextDetector(
                 val confidence = output[0, i, 4]
                 val classIndex = output[0, i, 5].toInt()
                 val threshold =
-                    if (classIndex == 0) {
-                        SECONDARY_CONFIDENCE_THRESHOLD
-                    } else {
-                        CONFIDENCE_THRESHOLD
-                    }
+                    model.confidenceThresholds?.getOrDefault(classIndex, model.defaultConfidenceThreshold)
+                        ?: model.defaultConfidenceThreshold
                 if (confidence < threshold) {
                     return@mapRows null
                 }
@@ -146,53 +149,66 @@ class TfliteMangaTextDetector(
                     classIndex = classIndex,
                 )
             }
-        return if (primaryClassOnly) {
-            rows.filter { it.classIndex == 1 }
-        } else {
-            rows
-        }
+        return model.allowedClassIndices?.let { indices ->
+            rows.filter { it.classIndex in indices }
+        } ?: rows
     }
 
+    data class ModelConfig(
+        val path: ModelPath,
+        val defaultConfidenceThreshold: Float,
+        val confidenceThresholds: IntFloatMap? = null,
+        val processorType: Processor.Type = Processor.DEFAULT_TYPE,
+        val allowedClassIndices: IntSet? = null,
+    )
+
     companion object {
-        private const val SECONDARY_CONFIDENCE_THRESHOLD = 0.7f
-        private const val CONFIDENCE_THRESHOLD = 0.25f
-
-        @Suppress("unused")
-        val MODEL_FLOAT32 =
-            ModelPath(
-                path = "manga-text-detector_float32.tflite",
-                sha256 = "cc8f6894424cebaeda7b3950004b77838967ba28e6d3b01bf94025689eebde40",
-            )
-
-        @Suppress("unused")
-        val MODEL_FLOAT16 =
-            ModelPath(
-                path = "manga-text-detector_float16.tflite",
-                sha256 = "ede78ec00d546528e85a743c65b4c7f1614b7271526149434674656f6e7c8ce1",
-            )
-
-        private val MODEL_INT8 =
-            ModelPath(
-                path = "manga-text-detector_int8.tflite",
-                sha256 = "2c8a423844cfb4707f26a1e0d493a8919315a2dfea079c2f1fdb5cf8e55a1f60",
-            )
-
         private val MODEL_INT8_WITH_DATA =
-            ModelPath(
-                path = "manga-text-detector_int8.with_data.tflite",
-                sha256 = "2bc1213c7dc666d326f1b6c5a74adc62a1e946cec8b607d146164c7e85dcaf71",
+            ModelConfig(
+                path =
+                    ModelPath(
+                        path = "manga-text-detector_int8.with_data.tflite",
+                        sha256 = "2bc1213c7dc666d326f1b6c5a74adc62a1e946cec8b607d146164c7e85dcaf71",
+                    ),
+                defaultConfidenceThreshold = 0.25f,
+                confidenceThresholds = intFloatMapOf(0, 0.7f),
+            )
+
+        @Suppress("unused")
+        val MODEL_INT8_WITH_DATA_SELECTIVE =
+            MODEL_INT8_WITH_DATA.copy(
+                processorType = Processor.Type.LETTERBOX_SELECTIVE,
+                // For this model, 1 is the "primary class"
+                allowedClassIndices = intSetOf(1),
+            )
+
+        val YOLO_COCO =
+            ModelConfig(
+                path =
+                    ModelPath(
+                        path = "coco-detector-yolos.tflite",
+                        sha256 = "066e3a79e587f0ed4de0dfcd7c0d2d8cad856ac7eafdafb92733166f46b0f31c",
+                    ),
+                defaultConfidenceThreshold = 0.25f,
+                confidenceThresholds = intFloatMapOf(1, 0.45f),
+                allowedClassIndices =
+                    intSetOf(
+                        0, // text
+                        1, // onomatopoeia
+                        // NOTE: 3 is "bubble" which is so far duplicative
+                    ),
             )
 
         suspend fun initialize(
             context: Context,
-            model: ModelPath = MODEL_INT8_WITH_DATA,
-            processorType: Processor.Type = Processor.DEFAULT_TYPE,
+            // model: ModelConfig = YOLO_COCO,
+           model: ModelConfig = MODEL_INT8_WITH_DATA,
         ): Detector =
             coroutineScope {
                 val modelFile =
                     async {
                         HfHubRepo("dhleong/manga-ocr-android")
-                            .resolveLocalPath(context, model)
+                            .resolveLocalPath(context, model.path)
                     }
 
                 val initialized = async { TfLite.initialize(context).await() }
@@ -209,16 +225,19 @@ class TfliteMangaTextDetector(
                 val targetWidth = 640
                 val targetHeight = 640
                 val processor =
-                    when (processorType) {
-                        Processor.Type.OLD -> OldProcessor(targetWidth, targetHeight)
-                        Processor.Type.LETTERBOX, Processor.Type.LETTERBOX_SELECTIVE ->
+                    when (model.processorType) {
+                        Processor.Type.OLD -> {
+                            OldProcessor(targetWidth, targetHeight)
+                        }
+
+                        Processor.Type.LETTERBOX, Processor.Type.LETTERBOX_SELECTIVE -> {
                             LetterboxProcessor(targetWidth, targetHeight)
+                        }
                     }
                 TfliteMangaTextDetector(
                     interpreter,
+                    model = model,
                     processor = processor,
-                    primaryClassOnly =
-                        processorType == Processor.Type.LETTERBOX_SELECTIVE,
                 )
             }
     }

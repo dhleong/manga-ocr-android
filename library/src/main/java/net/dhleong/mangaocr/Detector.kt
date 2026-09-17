@@ -27,7 +27,7 @@ interface Detector {
         ): Detector =
             LoggingDetector(
                 try {
-                    TfliteMangaTextDetector.initialize(context, processorType = processorType)
+                    TfliteMangaTextDetector.initialize(context)
                 } catch (e: LoadingException) {
                     if (!fallback) {
                         throw e
