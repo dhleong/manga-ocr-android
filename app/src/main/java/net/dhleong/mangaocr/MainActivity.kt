@@ -52,7 +52,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dhleong.mangaocr.ImageProcessor.Companion.resizeTo
-import net.dhleong.mangaocr.detector.TfliteMangaTextDetector
 import net.dhleong.mangaocr.ui.theme.MangaOCRTheme
 import okio.FileNotFoundException
 import okio.buffer
@@ -67,21 +66,10 @@ class MainActivity : ComponentActivity() {
     private val manager: MangaOcrManager by lazy {
         MangaOcrManager(this, lifecycleScope, lifecycle)
     }
-    private val detectorsByProcessor =
-        TfliteMangaTextDetector.Processor.Type.entries.associateWith { processor ->
-            lazy { DetectorManager(this, lifecycleScope, lifecycle, processorType = processor) }
+    private val detectorsByType =
+        Detector.Type.iterate().associateWith { detectorType ->
+            lazy { DetectorManager(this, lifecycleScope, lifecycle, type = detectorType) }
         }
-    private val oldDetector: Detector by lazy {
-        DetectorManager(this, lifecycleScope, lifecycle, forceLegacy = true)
-    }
-
-    sealed interface DetectorType {
-        data object Old : DetectorType
-
-        data class New(
-            val processor: TfliteMangaTextDetector.Processor.Type,
-        ) : DetectorType
-    }
 
     private data class DetectResult(
         val boxes: List<Detector.Result>,
@@ -96,9 +84,9 @@ class MainActivity : ComponentActivity() {
             var lastBitmap: Bitmap? by remember { mutableStateOf(null) }
             var loading by remember { mutableStateOf(false) }
             var output by remember { mutableStateOf("") }
-            var detectorType: DetectorType by remember {
+            var detectorType: Detector.Type by remember {
                 mutableStateOf(
-                    DetectorType.New(TfliteMangaTextDetector.Processor.DEFAULT_TYPE),
+                    Detector.Type.YoloCoco,
                 )
             }
             var detectResult by remember { mutableStateOf<DetectResult?>(null) }
@@ -108,11 +96,7 @@ class MainActivity : ComponentActivity() {
             val onDetect: (DetectResult?) -> Unit = { detectResult = it }
             val onResult: (CharSequence) -> Unit = { output = it.toString() }
 
-            val detector: Detector =
-                when (val t = detectorType) {
-                    DetectorType.Old -> oldDetector
-                    is DetectorType.New -> detectorsByProcessor[t.processor]!!.value
-                }
+            val detector: Detector = detectorsByType[detectorType]!!.value
 
             val doProcess: (Int) -> Unit = { index ->
                 onDetect(null)
@@ -362,8 +346,8 @@ private fun Bitmap.mutate(): Bitmap {
 @Suppress("ktlint:standard:function-naming", "SameParameterValue")
 @Composable
 private fun DetectorSelectorDropdown(
-    value: MainActivity.DetectorType,
-    onValueChanged: (MainActivity.DetectorType) -> Unit,
+    value: Detector.Type,
+    onValueChanged: (Detector.Type) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(
@@ -373,11 +357,7 @@ private fun DetectorSelectorDropdown(
         },
     ) {
         TextField(
-            value =
-                when (value) {
-                    MainActivity.DetectorType.Old -> "Legacy"
-                    is MainActivity.DetectorType.New -> value.processor.name
-                },
+            value = value.label,
             onValueChange = {},
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -387,18 +367,11 @@ private fun DetectorSelectorDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            DropdownMenuItem(
-                text = { Text(text = "Legacy") },
-                onClick = {
-                    onValueChanged(MainActivity.DetectorType.Old)
-                    expanded = false
-                },
-            )
-            TfliteMangaTextDetector.Processor.Type.entries.forEach { item ->
+            Detector.Type.iterate().forEach { item ->
                 DropdownMenuItem(
-                    text = { Text(text = item.name) },
+                    text = { Text(text = item.label) },
                     onClick = {
-                        onValueChanged(MainActivity.DetectorType.New(item))
+                        onValueChanged(item)
                         expanded = false
                     },
                 )

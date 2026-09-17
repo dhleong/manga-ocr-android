@@ -8,8 +8,25 @@ import net.dhleong.mangaocr.detector.Bbox
 import net.dhleong.mangaocr.detector.LoggingDetector
 import net.dhleong.mangaocr.detector.OrtComicTextDetector
 import net.dhleong.mangaocr.detector.TfliteMangaTextDetector
+import net.dhleong.mangaocr.detector.TfliteYolo26TextDetector
 
 interface Detector {
+    sealed class Type(
+        val label: String,
+    ) {
+        object Legacy : Type(label = "Legacy")
+
+        data class Yolo8(
+            val processor: TfliteMangaTextDetector.Processor.Type = TfliteMangaTextDetector.Processor.DEFAULT_TYPE,
+        ) : Type(label = "Yolo8 (Old)")
+
+        object YoloCoco : Type(label = "YoloCoco (New)")
+
+        companion object {
+            fun iterate() = listOf(Legacy, Yolo8(), YoloCoco)
+        }
+    }
+
     suspend fun process(bitmap: Bitmap): List<Result>
 
     data class Result(
@@ -18,16 +35,18 @@ interface Detector {
     )
 
     companion object {
-        suspend fun initializeLegacy(context: Context): Detector = LoggingDetector(OrtComicTextDetector.initialize(context))
-
         suspend fun initialize(
             context: Context,
-            processorType: TfliteMangaTextDetector.Processor.Type = TfliteMangaTextDetector.Processor.DEFAULT_TYPE,
+            type: Type,
             fallback: Boolean = true,
         ): Detector =
             LoggingDetector(
                 try {
-                    TfliteMangaTextDetector.initialize(context)
+                    when (type) {
+                        Type.Legacy -> OrtComicTextDetector.initialize(context)
+                        is Type.Yolo8 -> TfliteMangaTextDetector.initialize(context)
+                        Type.YoloCoco -> TfliteYolo26TextDetector.initialize(context)
+                    }
                 } catch (e: LoadingException) {
                     if (!fallback) {
                         throw e

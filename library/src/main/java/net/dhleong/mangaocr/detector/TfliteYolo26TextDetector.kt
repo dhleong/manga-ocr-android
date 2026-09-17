@@ -5,11 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.util.Log
 import androidx.collection.IntFloatMap
-import androidx.collection.IntSet
 import androidx.collection.intFloatMapOf
-import androidx.collection.intSetOf
 import com.google.android.gms.tflite.java.TfLite
-import com.google.common.primitives.Floats.min
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import net.dhleong.mangaocr.Detector
@@ -23,9 +20,13 @@ import org.tensorflow.lite.InterpreterApi
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
+import kotlin.math.min
 
-class TfliteMangaTextDetector(
+/**
+ * Old [TfliteMangaTextDetector] detector relied on embedded non-maximum suppression
+ * which is no longer supported
+ */
+class TfliteYolo26TextDetector(
     private val interpreter: InterpreterApi,
     private val model: ModelConfig,
     private val targetWidth: Int = 640,
@@ -38,9 +39,7 @@ class TfliteMangaTextDetector(
         }
 
         enum class Type {
-            OLD,
             LETTERBOX,
-            LETTERBOX_SELECTIVE,
         }
 
         fun preprocess(bitmap: Bitmap): TensorImage
@@ -50,34 +49,6 @@ class TfliteMangaTextDetector(
             bitmap: Bitmap,
             index: Int,
         ): RectF
-    }
-
-    class OldProcessor(
-        targetWidth: Int,
-        targetHeight: Int,
-    ) : Processor {
-        private val imageProcessor =
-            ImageProcessor
-                .Builder()
-                .add(ResizeOp(targetHeight, targetWidth, ResizeOp.ResizeMethod.BILINEAR))
-                .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
-                .build()
-
-        override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
-
-        override fun extractRect(
-            output: FloatTensor,
-            bitmap: Bitmap,
-            index: Int,
-        ): RectF {
-            // The YOLO model seems to output in xyxyn format,
-            // IE: normalized within the *original* width
-            val left = output[0, index, 0] * bitmap.width
-            val top = output[0, index, 1] * bitmap.height
-            val right = output[0, index, 2] * bitmap.width
-            val bottom = output[0, index, 3] * bitmap.height
-            return RectF(left, top, right, bottom)
-        }
     }
 
     class LetterboxProcessor(
@@ -109,16 +80,16 @@ class TfliteMangaTextDetector(
             val padY =
                 (targetHeight - bitmap.height * gain) / 2 - 0.1f
 
-            val xn = output[0, index, 0] * targetWidth
-            val yn = output[0, index, 1] * targetHeight
-            val xm = output[0, index, 2] * targetWidth
-            val ym = output[0, index, 3] * targetHeight
-            val left = (xn - padX) / gain
-            val top = (yn - padY) / gain
-            val right = (xm - padX) / gain
-            val bottom = (ym - padY) / gain
+            val cxn = output[0, 0, index] * targetWidth
+            val cyn = output[0, 1, index] * targetHeight
+            val wn = output[0, 2, index] * targetWidth
+            val hn = output[0, 3, index] * targetHeight
+            val cx = (cxn - padX) / gain
+            val cy = (cyn - padY) / gain
+            val wHalf = (wn / gain) * 0.5f
+            val hHalf = (hn / gain) * 0.5f
 
-            return RectF(left, top, right, bottom)
+            return RectF(cx - wHalf, cy - hHalf, cx + wHalf, cy + hHalf)
         }
     }
 
@@ -126,67 +97,67 @@ class TfliteMangaTextDetector(
         val processed = processor.preprocess(bitmap)
         val outputTensor = interpreter.getOutputTensor(0)
 
-        Log.v("TfliteDetector", "output tensors: ${interpreter.outputTensorCount}")
-        Log.v("TfliteDetector", "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
+        Log.v(TAG, "output tensors: ${interpreter.outputTensorCount}")
+        Log.v(TAG, "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
 
-        // TODO: transpose?
         val output = interpreter.allocateFloatOutputTensor(0, rowsCountIndex = 2)
         interpreter.run(processed.buffer, output.buffer)
 
-        Log.v("TfliteDetector", "outputRows=${output.rowsCount}")
-        val rows =
-            output.mapRows(quitEarlyOnNull = false) { i ->
-                val confidence = output[0, i, 4]
-                val classIndex = output[0, i, 5].toInt()
-                val threshold =
-                    model.confidenceThresholds?.getOrDefault(classIndex, model.defaultConfidenceThreshold)
-                        ?: model.defaultConfidenceThreshold
-                if (confidence < threshold) {
-                    return@mapRows null
+        Log.v(TAG, "outputRows=${output.rowsCount}")
+        return output.mapRows(quitEarlyOnNull = false) { i ->
+            val baseClassIndex = 4
+            var maxClass = -1
+            var maxConfidence = -1f
+            this.model.confidenceThresholds.forEach { classIndex, minConfidence ->
+                val confidenceIndex = baseClassIndex + classIndex
+                val confidence = output[0, confidenceIndex, i]
+                Log.v(TAG, "@ $i; class$classIndex has conf $confidence")
+                if (confidence >= minConfidence && confidence > maxConfidence) {
+                    maxConfidence = confidence
+                    maxClass = classIndex
                 }
-
-                val rect = processor.extractRect(output, bitmap, i)
-                Detector.Result(
-                    bbox = Bbox(rect, confidence),
-                    classIndex = classIndex,
-                )
             }
-        return model.allowedClassIndices?.let { indices ->
-            rows.filter { it.classIndex in indices }
-        } ?: rows
+            if (maxClass < 0) {
+                return@mapRows null
+            }
+
+            val rect = processor.extractRect(output, bitmap, i)
+            Detector.Result(
+                bbox = Bbox(rect, maxConfidence),
+                classIndex = maxClass,
+            )
+        }
     }
 
     data class ModelConfig(
         val path: ModelPath,
-        val defaultConfidenceThreshold: Float,
-        val confidenceThresholds: IntFloatMap? = null,
+        val confidenceThresholds: IntFloatMap,
         val processorType: Processor.Type = Processor.DEFAULT_TYPE,
-        val allowedClassIndices: IntSet? = null,
     )
 
     companion object {
-        private val MODEL_INT8_WITH_DATA =
+        private const val TAG = "TfliteYolo26TextDetector"
+
+        val YOLO_COCO =
             ModelConfig(
                 path =
                     ModelPath(
-                        path = "manga-text-detector_int8.with_data.tflite",
-                        sha256 = "2bc1213c7dc666d326f1b6c5a74adc62a1e946cec8b607d146164c7e85dcaf71",
+                        path = "coco-detector-yolos.tflite",
+                        sha256 = "066e3a79e587f0ed4de0dfcd7c0d2d8cad856ac7eafdafb92733166f46b0f31c",
                     ),
-                defaultConfidenceThreshold = 0.25f,
-                confidenceThresholds = intFloatMapOf(0, 0.7f),
-            )
-
-        @Suppress("unused")
-        val MODEL_INT8_WITH_DATA_SELECTIVE =
-            MODEL_INT8_WITH_DATA.copy(
-                processorType = Processor.Type.LETTERBOX_SELECTIVE,
-                // For this model, 1 is the "primary class"
-                allowedClassIndices = intSetOf(1),
+                confidenceThresholds =
+                    intFloatMapOf(
+                        0,
+                        0.25f, // text
+                        1,
+                        0.45f, // onomatopoeia
+                    ),
             )
 
         suspend fun initialize(
             context: Context,
-            model: ModelConfig = MODEL_INT8_WITH_DATA,
+            model: ModelConfig = YOLO_COCO,
+            // model: ModelConfig = MODEL_INT8_WITH_DATA,
         ): Detector =
             coroutineScope {
                 val modelFile =
@@ -210,15 +181,11 @@ class TfliteMangaTextDetector(
                 val targetHeight = 640
                 val processor =
                     when (model.processorType) {
-                        Processor.Type.OLD -> {
-                            OldProcessor(targetWidth, targetHeight)
-                        }
-
-                        Processor.Type.LETTERBOX, Processor.Type.LETTERBOX_SELECTIVE -> {
+                        Processor.Type.LETTERBOX -> {
                             LetterboxProcessor(targetWidth, targetHeight)
                         }
                     }
-                TfliteMangaTextDetector(
+                TfliteYolo26TextDetector(
                     interpreter,
                     model = model,
                     processor = processor,
