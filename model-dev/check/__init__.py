@@ -40,15 +40,32 @@ def yolo(path: Optional[Path] = None):
 @check.command()
 @options.yolo_model_size()
 @click.option(
+    "--quantize",
+    type=str,
+    default=None,
+)
+@click.option(
+    "--tflite/--no-tflite",
+    type=bool,
+    default=False,
+)
+@click.option(
     "--path",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
 )
-def yolo_coco(model_size: YoloModelSize, path: Optional[Path] = None):
+def yolo_coco(
+    model_size: YoloModelSize,
+    quantize: Optional[str],
+    tflite: bool,
+    path: Optional[Path] = None,
+):
     import ultralytics
 
-    from train.yolo_coco import get_model_path
+    from train.yolo_coco import get_model_path, get_tflite_path
 
-    model_path = get_model_path(model_size)
+    model_path = (
+        get_tflite_path(model_size, quantize) if tflite else get_model_path(model_size)
+    )
     assert model_path.exists(), f"Train the model first (looked for {model_path})"
 
     model = ultralytics.YOLO(str(model_path))
@@ -62,6 +79,7 @@ def yolo_coco(model_size: YoloModelSize, path: Optional[Path] = None):
     print(result.__dict__)
     print(result.boxes)
     result.show()
+    print(f"Showed results using {model_path}")
 
 
 @check.command()

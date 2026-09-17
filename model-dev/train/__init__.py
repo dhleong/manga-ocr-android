@@ -1,8 +1,11 @@
+from typing import Optional
+
 import click
 
 import options
 from const import YoloModelSize
 from train import dataset
+from train.yolo_coco import DEFAULT_QUANTIZE
 
 
 @click.group()
@@ -23,17 +26,31 @@ def manga109s():
 @click.option("--imgsz", type=int, default=640, help="Image size for training")
 @click.option("--batch-size", type=int, default=16, help="Batch size")
 @click.option(
+    "--quantize",
+    type=str,
+    default=None,
+    help="Quantize type (eg w8a32)",
+)
+@click.option(
     "--retrain/--no-retrain",
     type=bool,
     default=False,
-    help="Recreate an existing output",
+    help="Re-train over top of an existing pt model",
+)
+@click.option(
+    "--reexport/--no-reexport",
+    type=bool,
+    default=False,
+    help="Re-export over top an existing exported tflite model",
 )
 def yolo_coco(
     model_size: YoloModelSize,
     epochs: int,
     imgsz: int,
     batch_size: int,
+    quantize: Optional[str],
     retrain: bool,
+    reexport: bool,
 ):
     """Train YOLO model on COCO-converted data and export to TFLite."""
     from convert.coco_to_yolo import coco_to_yolo as prepare_dataset
@@ -48,5 +65,9 @@ def yolo_coco(
         epochs=epochs,
         imgsz=imgsz,
         batch_size=batch_size,
+        quantize=None
+        if quantize and quantize.lower() == "none"
+        else quantize or DEFAULT_QUANTIZE,
         retrain=retrain,
+        reexport=reexport,
     )

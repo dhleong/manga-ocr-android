@@ -1,17 +1,26 @@
 import shutil
 from pathlib import Path
+from typing import Optional
 
 from const import OUTPUTS, YoloModelSize
 
 PROJECT_DIR = OUTPUTS / "yolo-coco-training"
 
+
 # YOLO_VERSION = "v8"
 YOLO_VERSION = "26"
+
+DEFAULT_QUANTIZE = "w8a32"
 
 
 def get_model_path(model_size: YoloModelSize):
     model_dir = PROJECT_DIR / f"manga109-coco-{model_size}"
     return model_dir / "weights" / "best.pt"
+
+
+def get_tflite_path(model_size: YoloModelSize, quantize: Optional[str] = None):
+    suffix = f"-{quantize}" if quantize and quantize.lower() != "none" else ""
+    return OUTPUTS / f"coco-detector-yolo{model_size}{suffix}.tflite"
 
 
 def train_yolo(
@@ -79,13 +88,15 @@ def train_yolo(
 
 def export_to_tflite(
     *,
-    model_size: str,
+    dataset_dir: Path,
+    model_size: YoloModelSize,
     imgsz: int,
     model_path: Path,
-    retrain: bool,
+    reexport: bool,
+    quantize: Optional[str] = DEFAULT_QUANTIZE,
 ):
-    output_path = OUTPUTS / f"coco-detector-yolo{model_size}.tflite"
-    if output_path.exists() and not retrain:
+    output_path = get_tflite_path(model_size, quantize)
+    if output_path.exists() and not reexport:
         print(f"Found tflite model @{output_path}")
         return output_path
 
@@ -97,15 +108,14 @@ def export_to_tflite(
     # Create model for export
     export_model = YOLO(str(model_path))
 
-    # Export with int8 quantization
-    # Note: YOLO export to TFLite with quantization requires representative data
-    # For now, export without quantization and let user quantize
+    # Check dataset exists
+    yaml_path = dataset_dir / "dataset.yaml"
+    if not yaml_path.exists():
+        print(f"Error: Dataset YAML not found at {yaml_path}")
+        return
+
     export_path = export_model.export(
-        format="tflite",
-        imgsz=imgsz,
-        dynamic=False,
-        nms=True,
-        # int8=True,  # Requires calibration data
+        format="litert", imgsz=imgsz, quantize=quantize, data=str(yaml_path)
     )
 
     export_path = Path(export_path)
@@ -127,6 +137,8 @@ def build_yolo(
     imgsz: int,
     batch_size: int,
     retrain: bool = False,
+    reexport: bool = False,
+    quantize: Optional[str] = DEFAULT_QUANTIZE,
 ):
     model_pt_path = train_yolo(
         dataset_dir=dataset_dir,
@@ -139,8 +151,10 @@ def build_yolo(
     assert model_pt_path, "No model output"
 
     export_to_tflite(
+        dataset_dir=dataset_dir,
         model_size=model_size,
         imgsz=imgsz,
         model_path=model_pt_path,
-        retrain=retrain,
+        quantize=quantize,
+        reexport=retrain or reexport,
     )
