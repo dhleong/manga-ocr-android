@@ -84,7 +84,7 @@ def export_to_tflite(
     model_path: Path,
     retrain: bool,
 ):
-    output_path = OUTPUTS / f"manga109-yolo{model_size}.tflite"
+    output_path = OUTPUTS / f"coco-detector-yolo{model_size}.tflite"
     if output_path.exists() and not retrain:
         print(f"Found tflite model @{output_path}")
         return output_path
