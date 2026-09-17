@@ -21,18 +21,25 @@ open class BaseTensor<T>(
 
     inline fun <T> mapRows(
         quitEarlyOnNull: Boolean = true,
-        transform: (row: Int) -> T?,
-    ): List<T> {
-        val result = mutableListOf<T>()
-        for (row in 0 until rowsCount) {
-            val transformed = transform(row)
-            when {
-                transformed == null && quitEarlyOnNull ->
-                    return result
-                transformed != null ->
-                    result.add(transformed)
+        crossinline transform: (row: Int) -> T?,
+    ): List<T> = sequenceFromRows(quitEarlyOnNull, transform).toList()
+
+    inline fun <T> sequenceFromRows(
+        quitEarlyOnNull: Boolean = true,
+        crossinline transform: (row: Int) -> T?,
+    ): Sequence<T> =
+        sequence {
+            for (row in 0 until rowsCount) {
+                val transformed = transform(row)
+                when {
+                    transformed == null && quitEarlyOnNull -> {
+                        break
+                    }
+
+                    transformed != null -> {
+                        yield(transformed)
+                    }
+                }
             }
         }
-        return result
-    }
 }

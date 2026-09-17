@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import com.google.android.gms.dynamite.DynamiteModule.LoadingException
+import net.dhleong.mangaocr.detector.BBoxHolder
 import net.dhleong.mangaocr.detector.Bbox
 import net.dhleong.mangaocr.detector.LoggingDetector
 import net.dhleong.mangaocr.detector.OrtComicTextDetector
@@ -30,9 +31,9 @@ interface Detector {
     suspend fun process(bitmap: Bitmap): List<Result>
 
     data class Result(
-        val bbox: Bbox,
+        override val bbox: Bbox,
         val classIndex: Int,
-    )
+    ) : BBoxHolder
 
     companion object {
         suspend fun initialize(

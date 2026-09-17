@@ -17,9 +17,10 @@ import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
 import net.dhleong.mangaocr.tflite.ResizeWithPadOp
 import net.dhleong.mangaocr.tflite.await
 import org.tensorflow.lite.InterpreterApi
-import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.min
 
 /**
@@ -42,7 +43,7 @@ class TfliteYolo26TextDetector(
             LETTERBOX,
         }
 
-        fun preprocess(bitmap: Bitmap): TensorImage
+        fun preprocess(bitmap: Bitmap): ByteBuffer
 
         fun extractRect(
             output: FloatTensor,
@@ -60,10 +61,32 @@ class TfliteYolo26TextDetector(
             ImageProcessor
                 .Builder()
                 .add(resize)
-                .add(NormalizeOp(0f, 255f)) // [ 0, 1 ]
                 .build()
 
-        override fun preprocess(bitmap: Bitmap): TensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
+        override fun preprocess(bitmap: Bitmap): ByteBuffer {
+            val tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
+            val letterboxed = tensorImage.bitmap
+
+            val pixels = IntArray(targetWidth * targetHeight)
+            letterboxed.getPixels(pixels, 0, targetWidth, 0, 0, targetWidth, targetHeight)
+
+            val byteBuffer =
+                ByteBuffer
+                    .allocateDirect(1 * 3 * targetHeight * targetWidth * 4)
+                    .order(ByteOrder.nativeOrder())
+            val floatBuffer = byteBuffer.asFloatBuffer()
+
+            val area = targetWidth * targetHeight
+            val norm = 1f / 255f
+            for (i in pixels.indices) {
+                val pixel = pixels[i]
+                floatBuffer.put(i, ((pixel shr 16) and 0xFF) * norm)
+                floatBuffer.put(area + i, ((pixel shr 8) and 0xFF) * norm)
+                floatBuffer.put(2 * area + i, (pixel and 0xFF) * norm)
+            }
+            byteBuffer.rewind()
+            return byteBuffer
+        }
 
         override fun extractRect(
             output: FloatTensor,
@@ -101,42 +124,47 @@ class TfliteYolo26TextDetector(
         Log.v(TAG, "output: ${outputTensor.shape().toList()} ${outputTensor.dataType()}")
 
         val output = interpreter.allocateFloatOutputTensor(0, rowsCountIndex = 2)
-        interpreter.run(processed.buffer, output.buffer)
+        interpreter.run(processed, output.buffer)
 
         Log.v(TAG, "outputRows=${output.rowsCount}")
-        return output.mapRows(quitEarlyOnNull = false) { i ->
-            val baseClassIndex = 4
-            var maxClass = -1
-            var maxConfidence = -1f
-            this.model.confidenceThresholds.forEach { classIndex, minConfidence ->
-                val confidenceIndex = baseClassIndex + classIndex
-                val confidence = output[0, confidenceIndex, i]
-                Log.v(TAG, "@ $i; class$classIndex has conf $confidence")
-                if (confidence >= minConfidence && confidence > maxConfidence) {
-                    maxConfidence = confidence
-                    maxClass = classIndex
-                }
-            }
-            if (maxClass < 0) {
-                return@mapRows null
-            }
+        val baseClassIndex = 4
 
-            val rect = processor.extractRect(output, bitmap, i)
-            Detector.Result(
-                bbox = Bbox(rect, maxConfidence),
-                classIndex = maxClass,
-            )
-        }
+        return output
+            .sequenceFromRows(
+                quitEarlyOnNull = false,
+            ) { i ->
+                var maxClass = -1
+                var maxConfidence = -1f
+                this.model.confidenceThresholds.forEach { classIndex, minConfidence ->
+                    val confidenceIndex = baseClassIndex + classIndex
+                    val confidence = output[0, confidenceIndex, i]
+                    if (confidence >= minConfidence && confidence > maxConfidence) {
+                        maxConfidence = confidence
+                        maxClass = classIndex
+                    }
+                }
+                if (maxClass >= 0) {
+                    val rect = processor.extractRect(output, bitmap, i)
+                    Detector.Result(classIndex = maxClass, bbox = Bbox(rect, maxConfidence))
+                } else {
+                    null
+                }
+            }.groupBy { it.classIndex }
+            .flatMap { (_, boxes) ->
+                nonMaximumSuppression(listOf(boxes), threshold = model.nmsThreshold).first()
+            }
     }
 
     data class ModelConfig(
         val path: ModelPath,
         val confidenceThresholds: IntFloatMap,
+        val nmsThreshold: Float = DEFAULT_NMS_THRESHOLD,
         val processorType: Processor.Type = Processor.DEFAULT_TYPE,
     )
 
     companion object {
         private const val TAG = "TfliteYolo26TextDetector"
+        private const val DEFAULT_NMS_THRESHOLD = 0.5f
 
         val YOLO_COCO =
             ModelConfig(
@@ -148,16 +176,24 @@ class TfliteYolo26TextDetector(
                 confidenceThresholds =
                     intFloatMapOf(
                         0,
-                        0.25f, // text
+                        0.15f, // text
                         1,
                         0.45f, // onomatopoeia
                     ),
             )
 
+        val YOLO_COCO_QUANTIZED =
+            YOLO_COCO.copy(
+                path =
+                    ModelPath(
+                        path = "coco-detector-yolos-w8a32.tflite",
+                        sha256 = "38ee43a8bafc7ab1148b0c9ab5a52b4f4ccc0727245240ddb23f2f9943123aa0",
+                    ),
+            )
+
         suspend fun initialize(
             context: Context,
-            model: ModelConfig = YOLO_COCO,
-            // model: ModelConfig = MODEL_INT8_WITH_DATA,
+            model: ModelConfig = YOLO_COCO_QUANTIZED,
         ): Detector =
             coroutineScope {
                 val modelFile =

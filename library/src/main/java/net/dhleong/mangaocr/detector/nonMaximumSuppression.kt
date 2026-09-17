@@ -1,19 +1,24 @@
 package net.dhleong.mangaocr.detector
 
-fun nonMaximumSuppression(
-    boxes: List<List<Bbox>>,
+interface BBoxHolder {
+    val bbox: Bbox
+}
+
+fun <T : BBoxHolder> nonMaximumSuppression(
+    boxes: List<List<T>>,
     threshold: Float,
-): List<List<Bbox>> {
+): List<List<T>> {
     // borrowed from candle-transformers Rust module
     return boxes.map { boxesForClass ->
         val sorted = boxesForClass.toMutableList()
-        sorted.sortByDescending { it.confidence }
+        sorted.sortByDescending { it.bbox.confidence }
 
         var currentIndex = 0
         for (i in sorted.indices) {
+            @Suppress("EmptyRange") // false positive
             val drop =
                 (0 until currentIndex).any { prevIndex ->
-                    val iou = iou(sorted[prevIndex], sorted[i])
+                    val iou = iou(sorted[prevIndex].bbox, sorted[i].bbox)
                     iou > threshold
                 }
             if (!drop) {
