@@ -11,7 +11,7 @@ class DetectorManager(
     context: Context,
     scope: LifecycleCoroutineScope,
     lifecycle: Lifecycle,
-    private val type: Detector.Type,
+    private val type: Detector.Type = Detector.Type.YoloCoco,
 ) : BaseManager<Detector>(context, scope, lifecycle),
     Detector {
     override suspend fun initialize(context: Context): Detector = Detector.initialize(context, type = type)
