@@ -20,9 +20,9 @@ The required models are downloaded automatically when first used.
 
 ## Is it really fast?
 
-I haven't done any real benchmarking, but anecdotally—yes! A quantized version of the comictextdetector model from [koharu][koharu] took about 3s on average to detect text boxes; the default `Detector` implementation in the library works in about 300 *milliseconds*.
+I haven't done any real benchmarking, but anecdotally—yes! A quantized version of the comictextdetector model from [koharu][koharu] took about 3s on average to detect text boxes; the default `Detector` implementation in the library works in about 150 *milliseconds*.
 
-A quantized version of the [manga-ocr][manga-ocr] model took about 110ms *per character* in the box. The current `MangaOcr` implementation in the library only takes about 10ms per character.
+A quantized version of the [manga-ocr][manga-ocr] model took about 110ms *per character* in the box. The current `MangaOcr` implementation in the library only takes about 5ms per character.
 
 [manga-ocr]: https://github.com/kha-white/manga-ocr
 [jitpack]: https://jitpack.io/#dhleong/manga-ocr-android
