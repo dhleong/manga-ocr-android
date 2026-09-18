@@ -14,6 +14,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onCompletion
 import net.dhleong.mangaocr.MangaOcr
 import net.dhleong.mangaocr.Vocab
 import net.dhleong.mangaocr.hub.HfHubRepo
@@ -57,9 +58,24 @@ class SplitPhaseMangaOcr(
             },
     ) : Encoder {
         override fun encode(bitmap: Bitmap): FloatTensor {
-            val processed = imageProcessor.preprocess(bitmap)
-            val outputs = encoder.run(mapOf("pixel_values" to processed))
-            return FloatTensor.from(outputs.get("encoder_hidden_states").get()).assertHasRows()
+            val outputs =
+                imageProcessor.preprocess(bitmap).use { processed ->
+                    encoder.run(mapOf("pixel_values" to processed))
+                }
+
+            // Cleanup any other outputs that won't be directly used
+            // by the second phase, so we don't leak memory:
+            for ((k, v) in outputs) {
+                if (k != HIDDEN_STATES_TENSOR_KEY) {
+                    v.close()
+                }
+            }
+
+            return FloatTensor.from(outputs.get(HIDDEN_STATES_TENSOR_KEY).get()).assertHasRows()
+        }
+
+        companion object {
+            private const val HIDDEN_STATES_TENSOR_KEY = "encoder_hidden_states"
         }
     }
 
@@ -100,15 +116,24 @@ class SplitPhaseMangaOcr(
                     tokenIds,
                     longArrayOf(1, tokensCount.toLong()),
                 )
+
+            // Prefer to use the source tensor directly to avoid
+            // unnecssary byte copies
             val hiddenStatesTensor =
-                OnnxTensor.createTensor(
-                    OrtEnvironment.getEnvironment(),
-                    encoderHiddenStates.buffer,
-                    encoderHiddenStates.createLongShape(),
+                encoderHiddenStates.sourceOnnxTensor
+                    ?: OnnxTensor.createTensor(
+                        OrtEnvironment.getEnvironment(),
+                        encoderHiddenStates.buffer,
+                        encoderHiddenStates.createLongShape(),
+                    )
+            val inputs =
+                mapOf(
+                    "encoder_hidden_states" to hiddenStatesTensor,
+                    "input_ids" to tokenIdsTensor,
                 )
-            Log.v("TfliteMangaOcr", "inputInfo=${decoder.inputInfo} ${decoder.inputInfo["encoder_hidden_states"]?.info}")
-            val outputs = decoder.run(mapOf("encoder_hidden_states" to hiddenStatesTensor, "input_ids" to tokenIdsTensor))
-            return FloatTensor.from(outputs.get("logits").get()).assertHasRows()
+            return decoder.run(inputs).use { outputs ->
+                FloatTensor.from(outputs.get("logits").get()).assertHasRows()
+            }
         }
     }
 
@@ -120,7 +145,7 @@ class SplitPhaseMangaOcr(
             tokenIds: LongBuffer,
             tokensCount: Int,
         ): FloatTensor {
-            Log.v("TfliteMangaOcr", "output=${decoder.getOutputTensor(0).name()}")
+//            Log.v("TfliteMangaOcr", "output=${decoder.getOutputTensor(0).name()}")
             val logits = decoder.allocateFloatOutputTensor(0)
             decoder.runForMultipleInputsOutputs(
                 arrayOf(encoderHiddenStates.buffer, tokenIds),
@@ -130,13 +155,13 @@ class SplitPhaseMangaOcr(
         }
     }
 
-    override suspend fun process(bitmap: Bitmap): Flow<MangaOcr.Result> =
-        flow {
-            val hiddenStatesTensor =
-                withTiming("encode") {
-                    encoder.encode(bitmap)
-                }
+    override suspend fun process(bitmap: Bitmap): Flow<MangaOcr.Result> {
+        val hiddenStatesTensor =
+            withTiming("encode") {
+                encoder.encode(bitmap)
+            }
 
+        return flow {
             val tokenIds = LongBuffer.allocate(maxChars)
             tokenIds.put(2) // start token
             val result = StringBuilder()
@@ -166,11 +191,16 @@ class SplitPhaseMangaOcr(
                 tokenIds.limit(tokensCount + 1)
                 tokenIds.position(tokensCount)
                 tokenIds.put(maxTokenId.toLong())
-                Log.v("SplitPhaseMangaOcr", "Got token $maxTokenId ($token)")
+//                Log.v("SplitPhaseMangaOcr", "Got token $maxTokenId ($token)")
             }
 
             emit(MangaOcr.Result.FinalResult(result.toString()))
         }.flowOn(Dispatchers.IO)
+            .onCompletion {
+                hiddenStatesTensor.close()
+                Runtime.getRuntime().gc()
+            }
+    }
 
     companion object {
         private val TFLITE_MODEL_ENCODER =

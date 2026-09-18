@@ -10,6 +10,7 @@ class FloatTensor(
     shape: IntArray,
     rowsCount: Int,
     name: String,
+    val sourceOnnxTensor: OnnxTensor? = null,
 ) : BaseTensor<FloatBuffer>(buffer, shape, rowsCount, name) {
     operator fun get(
         x: Int,
@@ -62,6 +63,7 @@ class FloatTensor(
                 },
                 rowsCount = onnxTensor.info.shape[rowsCountIndex].toInt(),
                 name = onnxTensor.info.dimensionNames.joinToString(","),
+                sourceOnnxTensor = onnxTensor,
             )
         }
 
@@ -79,5 +81,9 @@ class FloatTensor(
                 name = tensor.name(),
             )
         }
+    }
+
+    override fun close() {
+        sourceOnnxTensor?.close()
     }
 }

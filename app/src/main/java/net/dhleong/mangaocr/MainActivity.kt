@@ -93,7 +93,10 @@ class MainActivity : ComponentActivity() {
             var detectResult by remember { mutableStateOf<DetectResult?>(null) }
 
             val onLoading: (Boolean) -> Unit = { loading = it }
-            val onBitmap: (Bitmap) -> Unit = { lastBitmap = it }
+            val onBitmap: (Bitmap) -> Unit = {
+                lastBitmap?.recycle()
+                lastBitmap = it
+            }
             val onDetect: (DetectResult?) -> Unit = { detectResult = it }
             val onResult: (CharSequence) -> Unit = { output = it.toString() }
 
@@ -119,6 +122,7 @@ class MainActivity : ComponentActivity() {
                                 onResult("$finalResults$ocr")
                             }
                         }
+                        b.recycle()
                     }
                 }
             }

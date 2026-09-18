@@ -1,11 +1,13 @@
 package net.dhleong.mangaocr.onnx
 
+import java.io.Closeable
+
 open class BaseTensor<T>(
     val buffer: T,
     protected val shape: IntArray,
     val rowsCount: Int,
     val name: String,
-) {
+) : Closeable {
     val rowIndices: IntRange
         get() = IntRange(0, (rowsCount - 1).coerceAtLeast(0))
 
@@ -42,4 +44,8 @@ open class BaseTensor<T>(
                 }
             }
         }
+
+    override fun close() {
+        // nop by default
+    }
 }
