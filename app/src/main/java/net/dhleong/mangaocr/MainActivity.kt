@@ -59,6 +59,7 @@ import okio.sink
 import okio.source
 import okio.use
 import java.io.File
+import kotlin.time.measureTimedValue
 
 private const val USE_REAL_IMAGE = true
 
@@ -292,7 +293,10 @@ class MainActivity : ComponentActivity() {
             val bitmap = bitmap ?: loadBitmap("https://www.21-draw.com/wp-content/uploads/2022/12/what-is-manga.jpg")
             setBitmap(bitmap.copy(Bitmap.Config.ARGB_8888, true).resizeTo(1024, 1024))
 
-            val boxes = detector.process(bitmap)
+            val (boxes, duration) =
+                measureTimedValue {
+                    detector.process(bitmap)
+                }
             setBitmap(
                 bitmap.mutate().applyCanvas {
                     for (box in boxes) {
@@ -312,7 +316,7 @@ class MainActivity : ComponentActivity() {
                     }
                 },
             )
-            setResult("Done.")
+            setResult("Done in ${duration.inWholeMilliseconds}ms.")
             setDetection(DetectResult(boxes, bitmap))
 
             setLoading(false)

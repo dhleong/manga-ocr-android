@@ -6,15 +6,18 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import org.tensorflow.lite.support.common.internal.SupportPreconditions
 import org.tensorflow.lite.support.image.ColorSpaceType
 import org.tensorflow.lite.support.image.ImageOperator
 import org.tensorflow.lite.support.image.TensorImage
+import kotlin.math.min
 
 class ResizeWithPadOp(
     private val targetHeight: Int,
     private val targetWidth: Int,
-) : ImageOperator {
+) : ImageOperator,
+    RectFImageOperator {
     @SuppressLint("UseKtx")
     private val output =
         Bitmap.createBitmap(
@@ -84,24 +87,41 @@ class ResizeWithPadOp(
         point: PointF,
         inputImageHeight: Int,
         inputImageWidth: Int,
-    ): PointF =
-        transformImpl(
-            point,
-            this.targetHeight,
-            this.targetWidth,
-            inputImageHeight,
-            inputImageWidth,
-        )
+    ): PointF {
+        val gain =
+            min(
+                targetHeight / inputImageHeight.toFloat(),
+                targetWidth / inputImageWidth.toFloat(),
+            )
+        val padX =
+            (targetWidth - inputImageWidth * gain) / 2 - 0.1f
+        val padY =
+            (targetHeight - inputImageHeight * gain) / 2 - 0.1f
 
-    private fun transformImpl(
-        point: PointF,
-        srcH: Int,
-        srcW: Int,
-        dstH: Int,
-        dstW: Int,
-    ): PointF =
-        PointF(
-            point.x + ((dstW - srcW) / 2).toFloat(),
-            point.y + ((dstH - srcH) / 2).toFloat(),
-        )
+        val x = (point.x - padX) / gain
+        val y = (point.y - padY) / gain
+        return PointF(x, y)
+    }
+
+    override fun inverseTransform(
+        rect: RectF,
+        inputImageHeight: Int,
+        inputImageWidth: Int,
+    ): RectF {
+        val gain =
+            min(
+                targetHeight / inputImageHeight.toFloat(),
+                targetWidth / inputImageWidth.toFloat(),
+            )
+        val padX =
+            (targetWidth - inputImageWidth * gain) / 2 - 0.1f
+        val padY =
+            (targetHeight - inputImageHeight * gain) / 2 - 0.1f
+
+        val cx = (rect.centerX() * targetWidth - padX) / gain
+        val cy = (rect.centerY() * targetHeight - padY) / gain
+        val wHalf = (rect.width() * targetWidth * 0.5f) / gain
+        val hHalf = (rect.height() * targetHeight * 0.5f) / gain
+        return RectF(cx - wHalf, cy - hHalf, cx + wHalf, cy + hHalf)
+    }
 }

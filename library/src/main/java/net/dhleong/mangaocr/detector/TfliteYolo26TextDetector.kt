@@ -2,7 +2,6 @@ package net.dhleong.mangaocr.detector
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.RectF
 import android.util.Log
 import androidx.collection.IntFloatMap
 import androidx.collection.intFloatMapOf
@@ -10,18 +9,14 @@ import com.google.android.gms.tflite.java.TfLite
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import net.dhleong.mangaocr.Detector
+import net.dhleong.mangaocr.ImageProcessor2
 import net.dhleong.mangaocr.hub.HfHubRepo
 import net.dhleong.mangaocr.hub.ModelPath
-import net.dhleong.mangaocr.onnx.FloatTensor
 import net.dhleong.mangaocr.onnx.FloatTensor.Companion.allocateFloatOutputTensor
 import net.dhleong.mangaocr.tflite.ResizeWithPadOp
 import net.dhleong.mangaocr.tflite.await
 import org.tensorflow.lite.InterpreterApi
-import org.tensorflow.lite.support.image.ImageProcessor
-import org.tensorflow.lite.support.image.TensorImage
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import kotlin.math.min
+import org.tensorflow.lite.support.common.ops.NormalizeOp
 
 /**
  * Old [TfliteMangaTextDetector] detector relied on embedded non-maximum suppression
@@ -30,94 +25,21 @@ import kotlin.math.min
 class TfliteYolo26TextDetector(
     private val interpreter: InterpreterApi,
     private val model: ModelConfig,
-    private val targetWidth: Int = 640,
-    private val targetHeight: Int = 640,
-    private val processor: Processor = LetterboxProcessor(targetWidth, targetHeight),
+    targetWidth: Int = 640,
+    targetHeight: Int = 640,
 ) : Detector {
-    interface Processor {
-        companion object {
-            val DEFAULT_TYPE = Type.LETTERBOX
-        }
-
-        enum class Type {
-            LETTERBOX,
-        }
-
-        fun preprocess(bitmap: Bitmap): ByteBuffer
-
-        fun extractRect(
-            output: FloatTensor,
-            bitmap: Bitmap,
-            index: Int,
-        ): RectF
-    }
-
-    class LetterboxProcessor(
-        private val targetWidth: Int,
-        private val targetHeight: Int,
-    ) : Processor {
-        private val resize = ResizeWithPadOp(targetHeight, targetWidth)
-        private val imageProcessor =
-            ImageProcessor
-                .Builder()
-                .add(resize)
-                .build()
-
-        override fun preprocess(bitmap: Bitmap): ByteBuffer {
-            val tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
-            val letterboxed = tensorImage.bitmap
-
-            val pixels = IntArray(targetWidth * targetHeight)
-            letterboxed.getPixels(pixels, 0, targetWidth, 0, 0, targetWidth, targetHeight)
-
-            val byteBuffer =
-                ByteBuffer
-                    .allocateDirect(1 * 3 * targetHeight * targetWidth * 4)
-                    .order(ByteOrder.nativeOrder())
-            val floatBuffer = byteBuffer.asFloatBuffer()
-
-            val area = targetWidth * targetHeight
-            val norm = 1f / 255f
-            for (i in pixels.indices) {
-                val pixel = pixels[i]
-                floatBuffer.put(i, ((pixel shr 16) and 0xFF) * norm)
-                floatBuffer.put(area + i, ((pixel shr 8) and 0xFF) * norm)
-                floatBuffer.put(2 * area + i, (pixel and 0xFF) * norm)
-            }
-            byteBuffer.rewind()
-            return byteBuffer
-        }
-
-        override fun extractRect(
-            output: FloatTensor,
-            bitmap: Bitmap,
-            index: Int,
-        ): RectF {
-            val gain =
-                min(
-                    targetHeight / bitmap.height.toFloat(),
-                    targetWidth / bitmap.width.toFloat(),
-                )
-            val padX =
-                (targetWidth - bitmap.width * gain) / 2 - 0.1f
-            val padY =
-                (targetHeight - bitmap.height * gain) / 2 - 0.1f
-
-            val cxn = output[0, 0, index] * targetWidth
-            val cyn = output[0, 1, index] * targetHeight
-            val wn = output[0, 2, index] * targetWidth
-            val hn = output[0, 3, index] * targetHeight
-            val cx = (cxn - padX) / gain
-            val cy = (cyn - padY) / gain
-            val wHalf = (wn / gain) * 0.5f
-            val hHalf = (hn / gain) * 0.5f
-
-            return RectF(cx - wHalf, cy - hHalf, cx + wHalf, cy + hHalf)
-        }
-    }
+    val processor =
+        ImageProcessor2(
+            ImageProcessor2.OutputFormat.NCHW,
+            inputWidth = targetWidth,
+            inputHeight = targetHeight,
+            bboxFormat = ImageProcessor2.BboxFormat.CenterAndSize,
+            resizeOp = ResizeWithPadOp(targetWidth, targetHeight),
+            normalizeOp = NormalizeOp(0f, 255f),
+        ) { floatBuffer, _ -> floatBuffer }
 
     override suspend fun process(bitmap: Bitmap): List<Detector.Result> {
-        val processed = processor.preprocess(bitmap)
+        val processed = processor.process(bitmap)
         val outputTensor = interpreter.getOutputTensor(0)
 
         Log.v(TAG, "output tensors: ${interpreter.outputTensorCount}")
@@ -144,7 +66,11 @@ class TfliteYolo26TextDetector(
                     }
                 }
                 if (maxClass >= 0) {
-                    val rect = processor.extractRect(output, bitmap, i)
+                    val a = output[0, 0, i]
+                    val b = output[0, 1, i]
+                    val c = output[0, 2, i]
+                    val d = output[0, 3, i]
+                    val rect = processor.inverseTransform(bitmap, a, b, c, d)
                     Detector.Result(classIndex = maxClass, bbox = Bbox(rect, maxConfidence))
                 } else {
                     null
@@ -159,7 +85,6 @@ class TfliteYolo26TextDetector(
         val path: ModelPath,
         val confidenceThresholds: IntFloatMap,
         val nmsThreshold: Float = DEFAULT_NMS_THRESHOLD,
-        val processorType: Processor.Type = Processor.DEFAULT_TYPE,
     )
 
     companion object {
@@ -213,18 +138,9 @@ class TfliteYolo26TextDetector(
                         },
                     )
 
-                val targetWidth = 640
-                val targetHeight = 640
-                val processor =
-                    when (model.processorType) {
-                        Processor.Type.LETTERBOX -> {
-                            LetterboxProcessor(targetWidth, targetHeight)
-                        }
-                    }
                 TfliteYolo26TextDetector(
                     interpreter,
                     model = model,
-                    processor = processor,
                 )
             }
     }
